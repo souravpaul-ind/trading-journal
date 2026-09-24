@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Trading Journal</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            padding: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        h1 { font-size: 1.4rem; color: #58a6ff; }
+        .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        input[type="date"] {
+            background: #161b22;
+            border: 1px solid #30363d;
+            color: #c9d1d9;
+            padding: 7px 10px;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+        button {
+            background: #238636;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover { background: #2ea043; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        button.clear { background: #30363d; }
+        button.clear:hover { background: #484f58; }
+        button.export { background: #1f6feb; }
+        button.export:hover { background: #388bfd; }
+
+        /* PnL Summary Cards */
+        .pnl-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        .pnl-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 14px;
+        }
+        .pnl-card .label {
+            font-size: 12px;
+            color: #8b949e;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .pnl-card .value {
+            font-size: 1.4rem;
+            font-weight: 700;
+        }
+        .pnl-card .sub {
+            font-size: 11px;
+            color: #8b949e;
+            margin-top: 4px;
+        }
+        .pos { color: #3fb950; }
+        .neg { color: #f85149; }
+
+        /* 7-day chart */
+        .chart-container {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 24px;
+        }
+        .chart-title {
+            font-size: 14px;
+            color: #f0f6fc;
+            margin-bottom: 14px;
+            font-weight: 600;
+        }
+        .chart-bars {
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+            height: 120px;
+            padding-bottom: 24px;
+            position: relative;
+        }
+        .bar-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            height: 100%;
+            position: relative;
+        }
+        .bar {
+            width: 100%;
+            max-width: 40px;
+            border-radius: 4px 4px 0 0;
+            min-height: 2px;
+            transition: all 0.3s;
+        }
+        .bar.pos-bar { background: #238636; }
+        .bar.neg-bar { background: #da3633; }
+        .bar-label {
+            position: absolute;
+            bottom: -22px;
+            font-size: 10px;
+            color: #8b949e;
+            white-space: nowrap;
+        }
+        .bar-value {
+            position: absolute;
+            top: -16px;
+            font-size: 10px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        /* Date group */
+        .date-group { margin-bottom: 28px; }
+        .date-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #30363d;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .date-title { font-size: 15px; font-weight: 600; color: #f0f6fc; }
+        .date-stats {
+            font-size: 13px;
+            color: #8b949e;
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+
+        /* Trade card */
+        .trade-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 14px;
+            margin-bottom: 10px;
+        }
+        .trade-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .symbol { font-weight: bold; font-size: 1.05rem; color: #f0f6fc; }
+        .side-buy { color: #3fb950; font-weight: 600; }
+        .side-sell { color: #f85149; font-weight: 600; }
+        .meta {
+            display: flex;
+            gap: 18px;
+            font-size: 12.5px;
+            color: #8b949e;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+        .meta span strong { color: #c9d1d9; font-weight: 500; }
+        textarea {
+            width: 100%;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 9px;
+            color: #c9d1d9;
+            font-size: 13px;
+            resize: vertical;
+            min-height: 52px;
+            font-family: inherit;
+        }
+        textarea:focus { outline: none; border-color: #58a6ff; }
+        .empty { text-align: center; color: #484f58; padding: 60px 0; }
+        .loading { text-align: center; color: #8b949e; padding: 40px 0; }
+        .status { font-size: 13px; color: #8b949e; margin-bottom: 12px; }
+        .section-title {
+            font-size: 15px;
+            color: #f0f6fc;
+            font-weight: 600;
+            margin-bottom: 14px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #30363d;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>📊 My Trading Journal</h1>
+        <div class="controls">
+            <input type="date" id="dateFilter" onchange="loadTrades()">
+            <button class="clear" onclick="clearFilter()">Clear</button>
+            <button onclick="syncOrders()" id="syncBtn">🔄 Sync</button>
+            <button class="export" onclick="exportCSV()">📥 CSV</button>
+            <button class="export" onclick="exportExcel()">📊 Excel</button>
+        </div>
+    </header>
+    <div class="status" id="status"></div>
+
+    <!-- Daily PnL Summary Cards -->
+    <div class="pnl-summary" id="pnlSummary"></div>
+
+    <!-- 7-Day PnL Chart -->
+    <div class="chart-container" id="chartContainer">
+        <div class="chart-title">📈 Last 7 Days PnL</div>
+        <div class="chart-bars" id="chartBars"></div>
+    </div>
+
+    <!-- Trades List -->
+    <div class="section-title">📋 All Trades</div>
+    <div id="trades"><div class="loading">Loading...</div></div>
+
+    <script>
+        let allTrades = [];
+
+        // Load all trades
+        async function loadTrades() {
+            const res = await fetch('/api/trades');
+            allTrades = await res.json();
+
+            renderSummary(allTrades);
+            renderChart(allTrades);
+            renderTrades(allTrades);
+        }
+
+        // ---------- 1. PnL Summary Cards ----------
+        function renderSummary(trades) {
+            const today = new Date().toISOString().split('T')[0];
+
+            // Today's PnL
+            const todayTrades = trades.filter(t =>
+                t.trade_time && t.trade_time.startsWith(today)
+            );
+            const todayPnl = calcNetPnl(todayTrades);
+
+            // This week's PnL (last 7 days)
+            const weekAgo = new Date();
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            const weekTrades = trades.filter(t =>
+                t.trade_time && new Date(t.trade_time) >= weekAgo
+            );
+            const weekPnl = calcNetPnl(weekTrades);
+
+            // This month's PnL
+            const monthStart = new Date();
+            monthStart.setDate(1);
+            monthStart.setHours(0, 0, 0, 0);
+            const monthTrades = trades.filter(t =>
+                t.trade_time && new Date(t.trade_time) >= monthStart
+            );
+            const monthPnl = calcNetPnl(monthTrades);
+
+            // All-time PnL
+            const allPnl = calcNetPnl(trades);
+
+            // Win rate
+            const wins = trades.filter(t => calcNetPnl([t]) > 0).length;
+            const winRate = trades.length ? ((wins / trades.length) * 100).toFixed(1) : 0;
+
+            const cards = [
+                { label: 'Today PnL', value: todayPnl, sub: `${todayTrades.length} trades` },
+                { label: 'This Week', value: weekPnl, sub: `${weekTrades.length} trades` },
+                { label: 'This Month', value: monthPnl, sub: `${monthTrades.length} trades` },
+                { label: 'All Time', value: allPnl, sub: `${trades.length} trades` },
+                { label: 'Win Rate', value: winRate, sub: `${wins} wins`, isPercent: true }
+            ];
+
+            document.getElementById('pnlSummary').innerHTML = cards.map(c => {
+                const cls = c.isPercent ? '' : (c.value >= 0 ? 'pos' : 'neg');
+                const sign = c.isPercent ? '' : (c.value >= 0 ? '+' : '');
+                const display = c.isPercent ? `${c.value}%` : `${sign}${c.value.toFixed(2)}`;
+                return `
+                    <div class="pnl-card">
+                        <div class="label">${c.label}</div>
+                        <div class="value ${cls}">${display}</div>
+                        <div class="sub">${c.sub}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Net PnL = PnL - fees - funding
+        function calcNetPnl(trades) {
+            return trades.reduce((sum, t) =>
+                sum + (t.pnl || 0) - (t.fee || 0) - (t.funding || 0), 0
+            );
+        }
+
+        // ---------- 2. 7-Day Chart ----------
+        function renderChart(trades) {
+            const days = [];
+            for (let i = 6; i >= 0; i--) {
+                const d = new Date();
+                d.setDate(d.getDate() - i);
+                const dateKey = d.toISOString().split('T')[0];
+                const dayTrades = trades.filter(t =>
+                    t.trade_time && t.trade_time.startsWith(dateKey)
+                );
+                days.push({
+                    date: dateKey,
+                    label: d.toLocaleDateString('en-US', {day: 'numeric', month: 'short'}),
+                    pnl: calcNetPnl(dayTrades)
+                });
+            }
+
+            const maxAbs = Math.max(...days.map(d => Math.abs(d.pnl)), 1);
+
+            document.getElementById('chartBars').innerHTML = days.map(d => {
+                const heightPercent = (Math.abs(d.pnl) / maxAbs) * 80;
+                const cls = d.pnl >= 0 ? 'pos-bar' : 'neg-bar';
+                const valueColor = d.pnl >= 0 ? '#3fb950' : '#f85149';
+                const sign = d.pnl >= 0 ? '+' : '';
+                return `
+                    <div class="bar-wrapper">
+                        <div class="bar-value" style="color:${valueColor};">
+                            ${d.pnl !== 0 ? sign + d.pnl.toFixed(0) : ''}
+                        </div>
+                        <div class="bar ${cls}" style="height: ${Math.max(heightPercent, 2)}%;"></div>
+                        <div class="bar-label">${d.label}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ---------- 3. Trades List (date-wise) ----------
+        function renderTrades(trades) {
+            const container = document.getElementById('trades');
+
+            if (!trades.length) {
+                container.innerHTML = '<div class="empty">No trades found.</div>';
+                return;
+            }
+
+            const groups = {};
+            trades.forEach(t => {
+                const dateKey = t.trade_time
+                    ? new Date(t.trade_time).toISOString().split('T')[0]
+                    : 'Unknown';
+                if (!groups[dateKey]) groups[dateKey] = [];
+                groups[dateKey].push(t);
+            });
+
+            const sortedDates = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+
+            container.innerHTML = sortedDates.map(date => {
+                const dayTrades = groups[date];
+                const dayPnl = calcNetPnl(dayTrades);
+                const dayFee = dayTrades.reduce((s, t) => s + (t.fee || 0), 0);
+                const dayFunding = dayTrades.reduce((s, t) => s + (t.funding || 0), 0);
+                const pnlClass = dayPnl >= 0 ? 'pos' : 'neg';
+                const pnlSign = dayPnl >= 0 ? '+' : '';
+
+                return `
+                    <div class="date-group">
+                        <div class="date-header">
+                            <div class="date-title">📅 ${formatDate(date)}</div>
+                            <div class="date-stats">
+                                <span>${dayTrades.length} trades</span>
+                                <span>Fee: ${dayFee.toFixed(2)}</span>
+                                <span>Funding: ${dayFunding.toFixed(2)}</span>
+                                <span class="${pnlClass}">Net: ${pnlSign}${dayPnl.toFixed(2)}</span>
+                            </div>
+                        </div>
+                        ${dayTrades.map(t => renderTradeCard(t)).join('')}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderTradeCard(t) {
+            const time = t.trade_time
+                ? new Date(t.trade_time).toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit'})
+                : '';
+            const netPnl = calcNetPnl([t]);
+            const pnlClass = netPnl >= 0 ? 'pos' : 'neg';
+            const pnlSign = netPnl >= 0 ? '+' : '';
+
+            return `
+                <div class="trade-card">
+                    <div class="trade-header">
+                        <span class="symbol">${t.symbol || 'N/A'} <span style="color:#8b949e;font-size:12px;font-weight:400;">${time}</span></span>
+                        <span class="${t.side === 'buy' ? 'side-buy' : 'side-sell'}">
+                            ${t.side === 'buy' ? '🟢 BUY' : '🔴 SELL'}
+                        </span>
+                    </div>
+                    <div class="meta">
+                        <span>Size: <strong>${t.size}</strong></span>
+                        <span>Entry: <strong>${t.entry_price}</strong></span>
+                        <span>Exit: <strong>${t.exit_price}</strong></span>
+                        <span>Fee: <strong>${(t.fee || 0).toFixed(2)}</strong></span>
+                        <span>Funding: <strong>${(t.funding || 0).toFixed(2)}</strong></span>
+                        <span class="${pnlClass}">Net: ${pnlSign}${netPnl.toFixed(2)}</span>
+                    </div>
+                    <textarea placeholder="Write your mistake or learning from this trade..."
+                        onblur="saveNote(${t.id}, this.value)">${t.note || ''}</textarea>
+                </div>
+            `;
+        }
+
+        function formatDate(dateStr) {
+            if (dateStr === 'Unknown') return 'Unknown Date';
+            const d = new Date(dateStr + 'T00:00:00');
+            return d.toLocaleDateString('en-US', {
+                day: 'numeric', month: 'short', year: 'numeric', weekday: 'long'
+            });
+        }
+
+        async function saveNote(tradeId, note) {
+            await fetch(`/api/trades/${tradeId}/note`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({note})
+            });
+        }
+
+        function clearFilter() {
+            document.getElementById('dateFilter').value = '';
+            loadTrades();
+        }
+
+        // ---------- 4. Export Functions ----------
+        function exportCSV() {
+            const date = document.getElementById('dateFilter').value;
+            const url = date ? `/api/export/csv?date=${date}` : '/api/export/csv';
+            window.location.href = url;
+        }
+
+        function exportExcel() {
+            const date = document.getElementById('dateFilter').value;
+            const url = date ? `/api/export/excel?date=${date}` : '/api/export/excel';
+            window.location.href = url;
+        }
+
+        // ---------- 5. Sync ----------
+        async function syncOrders() {
+            const btn = document.getElementById('syncBtn');
+            const status = document.getElementById('status');
+            btn.disabled = true;
+            status.textContent = 'Syncing... (may take time for older orders)';
+            try {
+                const res = await fetch('/api/sync', {method: 'POST'});
+                const data = await res.json();
+                status.textContent = `✓ ${data.synced} orders synced`;
+                loadTrades();
+            } catch (e) {
+                status.textContent = '✗ Sync failed';
+            }
+            btn.disabled = false;
+            setTimeout(() => status.textContent = '', 5000);
+        }
+
+        loadTrades();
+    </script>
+</body>
+</html>
