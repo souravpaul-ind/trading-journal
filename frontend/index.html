@@ -6,100 +6,229 @@
     <title>My Trading Journal</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg: #0d1117;
+            --card: #161b22;
+            --border: #30363d;
+            --text: #c9d1d9;
+            --text-bright: #f0f6fc;
+            --text-muted: #8b949e;
+            --green: #3fb950;
+            --red: #f85149;
+            --blue: #58a6ff;
+            --accent: #1f6feb;
+        }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: #0d1117;
-            color: #c9d1d9;
-            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            background-image: 
+                radial-gradient(circle at 20% 0%, rgba(88, 166, 255, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 80% 100%, rgba(63, 185, 80, 0.04) 0%, transparent 50%);
+            color: var(--text);
+            padding: 16px;
             max-width: 900px;
             margin: 0 auto;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
         }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-6px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        @keyframes barGrow {
+            from { transform: scaleY(0); }
+            to { transform: scaleY(1); }
+        }
+
         header {
             display: flex;
-            justify-content: space-between;
+            flex-direction: column;
             align-items: center;
-            margin-bottom: 20px;
+            margin-bottom: 18px;
+            gap: 12px;
+            animation: fadeIn 0.4s ease;
+        }
+        h1 { 
+            font-size: 1.8rem; 
+            color: var(--blue);
+            letter-spacing: -0.5px;
+            text-align: center;
+            font-weight: 800;
+        }
+
+        .controls { 
+            display: flex; 
+            gap: 8px; 
+            align-items: center; 
             flex-wrap: wrap;
-            gap: 10px;
+            justify-content: center;
+            width: 100%;
         }
-        h1 { font-size: 1.4rem; color: #58a6ff; }
-        .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-        input[type="date"] {
-            background: #161b22;
-            border: 1px solid #30363d;
-            color: #c9d1d9;
-            padding: 7px 10px;
-            border-radius: 6px;
-            font-size: 13px;
+
+        input[type="date"]#dateFilter {
+            background: var(--card);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 11px 14px;
+            border-radius: 8px;
+            font-size: 13.5px;
+            color-scheme: dark;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            font-family: inherit;
+            width: 180px;
+            min-width: 180px;
+            max-width: 180px;
+            text-align: center;
+            cursor: pointer;
         }
+        input[type="date"]#dateFilter:hover { 
+            border-color: #484f58; 
+        }
+        input[type="date"]#dateFilter:focus { 
+            outline: none; 
+            border-color: var(--blue);
+            box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
+        }
+        input[type="date"]#dateFilter:not(:focus):invalid::-webkit-datetime-edit {
+            color: rgba(139, 148, 158, 0.55);
+        }
+        input[type="date"]#dateFilter::-webkit-calendar-picker-indicator {
+            cursor: pointer;
+            filter: invert(0.8);
+            opacity: 0.7;
+            padding: 0;
+            margin-left: 4px;
+        }
+        input[type="date"]#dateFilter::-webkit-calendar-picker-indicator:hover {
+            opacity: 1;
+        }
+
         button {
             background: #238636;
             color: white;
             border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
+            padding: 11px 18px;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 13.5px;
+            font-weight: 500;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+            font-family: inherit;
         }
-        button:hover { background: #2ea043; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
-        button.clear { background: #30363d; }
-        button.clear:hover { background: #484f58; }
-        button.export { background: #1f6feb; }
-        button.export:hover { background: #388bfd; }
+        button:hover { 
+            background: #2ea043;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(35, 134, 54, 0.3);
+        }
+        button:active { transform: translateY(0); }
+        button:disabled { 
+            opacity: 0.5; 
+            cursor: not-allowed; 
+            transform: none;
+            box-shadow: none;
+        }
+        button.clear { background: var(--border); }
+        button.clear:hover { 
+            background: #484f58;
+            box-shadow: 0 4px 12px rgba(72, 79, 88, 0.3);
+        }
+        button.export { background: var(--accent); }
+        button.export:hover { 
+            background: #388bfd;
+            box-shadow: 0 4px 12px rgba(31, 111, 235, 0.3);
+        }
+        button.csv { background: #8957e5; }
+        button.csv:hover { 
+            background: #a371f7;
+            box-shadow: 0 4px 12px rgba(137, 87, 229, 0.3);
+        }
+        button.pdf { background: #da3633; }
+        button.pdf:hover { 
+            background: #f85149;
+            box-shadow: 0 4px 12px rgba(218, 54, 51, 0.3);
+        }
 
-        /* PnL Summary Cards */
         .pnl-summary {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 12px;
-            margin-bottom: 24px;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 16px;
         }
         .pnl-card {
-            background: #161b22;
-            border: 1px solid #30363d;
-            border-radius: 8px;
-            padding: 14px;
+            background: linear-gradient(135deg, #161b22 0%, #1a1f26 100%);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 13px;
+            transition: all 0.25s ease;
+            animation: fadeIn 0.4s ease backwards;
         }
+        .pnl-card:hover {
+            border-color: #484f58;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+        .pnl-card:nth-child(1) { animation-delay: 0.05s; }
+        .pnl-card:nth-child(2) { animation-delay: 0.1s; }
+        .pnl-card:nth-child(3) { animation-delay: 0.15s; }
+        .pnl-card:nth-child(4) { animation-delay: 0.2s; }
+        .pnl-card:nth-child(5) { animation-delay: 0.25s; }
+        .pnl-card:nth-child(6) { animation-delay: 0.3s; }
         .pnl-card .label {
-            font-size: 12px;
-            color: #8b949e;
+            font-size: 10.5px;
+            color: var(--text-muted);
             margin-bottom: 6px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.6px;
+            font-weight: 500;
         }
         .pnl-card .value {
-            font-size: 1.4rem;
+            font-size: 1.3rem;
             font-weight: 700;
+            letter-spacing: -0.5px;
         }
         .pnl-card .sub {
-            font-size: 11px;
-            color: #8b949e;
-            margin-top: 4px;
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-top: 3px;
         }
-        .pos { color: #3fb950; }
-        .neg { color: #f85149; }
+        .pos { color: var(--green); }
+        .neg { color: var(--red); }
 
-        /* 7-day chart */
+        /* Chart container */
         .chart-container {
-            background: #161b22;
-            border: 1px solid #30363d;
-            border-radius: 8px;
+            background: linear-gradient(135deg, #161b22 0%, #1a1f26 100%);
+            border: 1px solid var(--border);
+            border-radius: 10px;
             padding: 16px;
-            margin-bottom: 24px;
+            margin-bottom: 18px;
+            animation: fadeIn 0.5s ease 0.15s backwards;
         }
         .chart-title {
-            font-size: 14px;
-            color: #f0f6fc;
-            margin-bottom: 14px;
+            font-size: 12.5px;
+            color: var(--text-bright);
+            margin-top: 0;
+            margin-bottom: 8px;
             font-weight: 600;
+            text-align: center;
         }
+        /* Chart bars - proper height for bars to show */
         .chart-bars {
             display: flex;
             align-items: flex-end;
-            gap: 8px;
-            height: 120px;
-            padding-bottom: 24px;
+            gap: 6px;
+            height: 130px;
+            padding-top: 20px;
+            padding-bottom: 22px;
             position: relative;
         }
         .bar-wrapper {
@@ -110,188 +239,350 @@
             justify-content: flex-end;
             height: 100%;
             position: relative;
+            min-width: 0;
         }
         .bar {
             width: 100%;
-            max-width: 40px;
+            max-width: 38px;
             border-radius: 4px 4px 0 0;
-            min-height: 2px;
-            transition: all 0.3s;
+            min-height: 4px;
+            transition: all 0.3s ease;
+            animation: barGrow 0.5s ease backwards;
+            transform-origin: bottom;
+            cursor: pointer;
         }
-        .bar.pos-bar { background: #238636; }
-        .bar.neg-bar { background: #da3633; }
+        .bar-wrapper:nth-child(1) .bar { animation-delay: 0.1s; }
+        .bar-wrapper:nth-child(2) .bar { animation-delay: 0.15s; }
+        .bar-wrapper:nth-child(3) .bar { animation-delay: 0.2s; }
+        .bar-wrapper:nth-child(4) .bar { animation-delay: 0.25s; }
+        .bar-wrapper:nth-child(5) .bar { animation-delay: 0.3s; }
+        .bar-wrapper:nth-child(6) .bar { animation-delay: 0.35s; }
+        .bar-wrapper:nth-child(7) .bar { animation-delay: 0.4s; }
+        .bar.pos-bar { 
+            background: linear-gradient(180deg, #56d364 0%, #238636 100%);
+            box-shadow: 0 0 12px rgba(63, 185, 80, 0.2);
+        }
+        .bar.neg-bar { 
+            background: linear-gradient(180deg, #ff7b72 0%, #da3633 100%);
+            box-shadow: 0 0 12px rgba(248, 81, 73, 0.2);
+        }
+        .bar:hover { filter: brightness(1.2); }
         .bar-label {
             position: absolute;
-            bottom: -22px;
-            font-size: 10px;
-            color: #8b949e;
+            bottom: -20px;
+            font-size: 9.5px;
+            color: var(--text-muted);
             white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
         }
         .bar-value {
             position: absolute;
             top: -16px;
-            font-size: 10px;
+            font-size: 9.5px;
             font-weight: 600;
             white-space: nowrap;
         }
 
-        /* Date group */
-        .date-group { margin-bottom: 28px; }
+        .date-group { 
+            margin-bottom: 22px;
+            animation: fadeIn 0.4s ease backwards;
+        }
         .date-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding: 8px 0;
-            border-bottom: 1px solid #30363d;
-            margin-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 10px;
             flex-wrap: wrap;
-            gap: 8px;
+            gap: 6px;
         }
-        .date-title { font-size: 15px; font-weight: 600; color: #f0f6fc; }
+        .date-title { 
+            font-size: 13.5px; 
+            font-weight: 600; 
+            color: var(--text-bright);
+        }
         .date-stats {
-            font-size: 13px;
-            color: #8b949e;
+            font-size: 11.5px;
+            color: var(--text-muted);
             display: flex;
-            gap: 14px;
+            gap: 10px;
             flex-wrap: wrap;
         }
 
-        /* Trade card */
         .trade-card {
-            background: #161b22;
-            border: 1px solid #30363d;
-            border-radius: 8px;
-            padding: 14px;
+            background: linear-gradient(135deg, #161b22 0%, #1a1f26 100%);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 13px;
             margin-bottom: 10px;
+            transition: all 0.25s ease;
+            animation: slideIn 0.3s ease backwards;
+        }
+        .trade-card:hover {
+            border-color: #484f58;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
         }
         .trade-header {
             display: flex;
             justify-content: space-between;
             margin-bottom: 10px;
         }
-        .symbol { font-weight: bold; font-size: 1.05rem; color: #f0f6fc; }
-        .side-buy { color: #3fb950; font-weight: 600; }
-        .side-sell { color: #f85149; font-weight: 600; }
-        .meta {
-            display: flex;
-            gap: 18px;
-            font-size: 12.5px;
-            color: #8b949e;
-            margin-bottom: 10px;
-            flex-wrap: wrap;
+        .symbol { 
+            font-weight: 700; 
+            font-size: 1.05rem; 
+            color: var(--text-bright);
+            letter-spacing: -0.3px;
         }
-        .meta span strong { color: #c9d1d9; font-weight: 500; }
+        .side-buy { 
+            color: var(--green); 
+            font-weight: 700; 
+            font-size: 12.5px;
+            padding: 3px 8px;
+            background: rgba(63, 185, 80, 0.12);
+            border-radius: 6px;
+        }
+        .side-sell { 
+            color: var(--red); 
+            font-weight: 700; 
+            font-size: 12.5px;
+            padding: 3px 8px;
+            background: rgba(248, 81, 73, 0.12);
+            border-radius: 6px;
+        }
+
+        .auto-info {
+            background: rgba(13, 17, 23, 0.6);
+            border: 1px solid rgba(48, 54, 61, 0.5);
+            border-radius: 8px;
+            padding: 11px;
+            margin-bottom: 11px;
+            font-size: 11.5px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 9px;
+        }
+        .auto-info .item {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .auto-info .item .lbl { color: var(--text-muted); }
+        .auto-info .item .val { color: var(--text); font-weight: 600; }
+
+        .exit-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 9px;
+            margin-bottom: 11px;
+        }
+        .input-box { display: flex; flex-direction: column; }
+        .input-box label {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            font-weight: 500;
+        }
+        .input-box input {
+            background: rgba(13, 17, 23, 0.8);
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            padding: 8px 10px;
+            color: var(--text);
+            font-size: 13px;
+            font-family: inherit;
+            width: 100%;
+            transition: all 0.2s ease;
+        }
+        .input-box input:focus {
+            outline: none;
+            border-color: var(--blue);
+            box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
+        }
+        .input-box input.highlight { 
+            border-color: #9e6a03;
+            background: rgba(158, 106, 3, 0.08);
+        }
+        .input-box input.highlight:focus {
+            box-shadow: 0 0 0 3px rgba(158, 106, 3, 0.15);
+        }
+        .input-box input[type="number"]::-webkit-outer-spin-button,
+        .input-box input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none; margin: 0;
+        }
+        .input-box input[type="number"] { -moz-appearance: textfield; }
+
         textarea {
             width: 100%;
-            background: #0d1117;
-            border: 1px solid #30363d;
-            border-radius: 6px;
-            padding: 9px;
-            color: #c9d1d9;
-            font-size: 13px;
+            background: rgba(13, 17, 23, 0.8);
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            padding: 9px 10px;
+            color: var(--text);
+            font-size: 12.5px;
             resize: vertical;
-            min-height: 52px;
+            min-height: 48px;
             font-family: inherit;
+            transition: all 0.2s ease;
         }
-        textarea:focus { outline: none; border-color: #58a6ff; }
-        .empty { text-align: center; color: #484f58; padding: 60px 0; }
-        .loading { text-align: center; color: #8b949e; padding: 40px 0; }
-        .status { font-size: 13px; color: #8b949e; margin-bottom: 12px; }
+        textarea:focus { 
+            outline: none; 
+            border-color: var(--blue);
+            box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
+        }
+        textarea::placeholder { color: #484f58; }
+
+        .empty { 
+            text-align: center; 
+            color: #484f58; 
+            padding: 60px 20px;
+            font-size: 13.5px;
+            animation: fadeIn 0.4s ease;
+        }
+        .loading { 
+            text-align: center; 
+            color: var(--text-muted); 
+            padding: 40px 0;
+            animation: pulse 1.5s ease infinite;
+        }
+        .status { 
+            font-size: 12px; 
+            color: var(--text-muted); 
+            margin-bottom: 10px; 
+            min-height: 18px;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
         .section-title {
-            font-size: 15px;
-            color: #f0f6fc;
+            font-size: 14px;
+            color: var(--text-bright);
             font-weight: 600;
-            margin-bottom: 14px;
+            margin-bottom: 12px;
             padding-bottom: 8px;
-            border-bottom: 1px solid #30363d;
+            border-bottom: 1px solid var(--border);
+            letter-spacing: -0.2px;
+        }
+        .pending-badge {
+            background: linear-gradient(135deg, #9e6a03 0%, #bb8009 100%);
+            color: #fff;
+            font-size: 9px;
+            padding: 2px 7px;
+            border-radius: 10px;
+            margin-left: 6px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            animation: pulse 2s ease infinite;
+        }
+
+        @media (max-width: 480px) {
+            body { padding: 12px; }
+            h1 { font-size: 1.5rem; }
+            .pnl-summary { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+            .pnl-card { padding: 10px; }
+            .pnl-card .value { font-size: 0.95rem; }
+            .pnl-card .label { font-size: 9px; }
+            .pnl-card .sub { font-size: 8.5px; }
+            .auto-info { font-size: 11px; padding: 9px; }
+            .exit-row { gap: 6px; }
+            .bar-label { font-size: 9px; }
+            .bar-value { font-size: 9px; }
+            button { padding: 9px 12px; font-size: 12px; }
+            input[type="date"]#dateFilter { 
+                width: 150px; 
+                min-width: 150px; 
+                max-width: 150px; 
+                padding: 9px 10px; 
+                font-size: 12px; 
+            }
+            .chart-title { font-size: 11.5px; margin-bottom: 6px; }
+            .chart-bars { height: 120px; padding-top: 18px; }
         }
     </style>
 </head>
 <body>
     <header>
-        <h1>📊 My Trading Journal</h1>
+        <h1>Trading Journal</h1>
         <div class="controls">
             <input type="date" id="dateFilter" onchange="loadTrades()">
-            <button class="clear" onclick="clearFilter()">Clear</button>
+            <button class="clear" onclick="clearFilter()">All</button>
             <button onclick="syncOrders()" id="syncBtn">🔄 Sync</button>
-            <button class="export" onclick="exportCSV()">📥 CSV</button>
+            <button class="csv" onclick="exportCSV()">📄 CSV</button>
             <button class="export" onclick="exportExcel()">📊 Excel</button>
+            <button class="pdf" onclick="exportPDF()">📕 PDF</button>
         </div>
     </header>
     <div class="status" id="status"></div>
 
-    <!-- Daily PnL Summary Cards -->
     <div class="pnl-summary" id="pnlSummary"></div>
 
-    <!-- 7-Day PnL Chart -->
-    <div class="chart-container" id="chartContainer">
-        <div class="chart-title">📈 Last 7 Days PnL</div>
+    <div class="chart-container">
+        <div class="chart-title">Last 7 Days PnL</div>
         <div class="chart-bars" id="chartBars"></div>
     </div>
 
-    <!-- Trades List -->
     <div class="section-title">📋 All Trades</div>
     <div id="trades"><div class="loading">Loading...</div></div>
 
     <script>
         let allTrades = [];
 
-        // Load all trades
         async function loadTrades() {
-            const res = await fetch('/api/trades');
+            const date = document.getElementById('dateFilter').value;
+            const url = date ? `/api/trades?date=${date}` : '/api/trades';
+            const res = await fetch(url);
             allTrades = await res.json();
-
             renderSummary(allTrades);
             renderChart(allTrades);
             renderTrades(allTrades);
         }
 
-        // ---------- 1. PnL Summary Cards ----------
+        function calcNetPnl(trades) {
+            return trades.reduce((sum, t) => {
+                if (!t.exit_price) return sum;
+                return sum + (t.pnl || 0) + (t.funding || 0) - (t.fee || 0);
+            }, 0);
+        }
+
         function renderSummary(trades) {
             const today = new Date().toISOString().split('T')[0];
-
-            // Today's PnL
-            const todayTrades = trades.filter(t =>
-                t.trade_time && t.trade_time.startsWith(today)
-            );
+            const todayTrades = trades.filter(t => t.trade_time && t.trade_time.startsWith(today));
             const todayPnl = calcNetPnl(todayTrades);
 
-            // This week's PnL (last 7 days)
             const weekAgo = new Date();
             weekAgo.setDate(weekAgo.getDate() - 7);
-            const weekTrades = trades.filter(t =>
-                t.trade_time && new Date(t.trade_time) >= weekAgo
-            );
+            const weekTrades = trades.filter(t => t.trade_time && new Date(t.trade_time) >= weekAgo);
             const weekPnl = calcNetPnl(weekTrades);
 
-            // This month's PnL
             const monthStart = new Date();
             monthStart.setDate(1);
             monthStart.setHours(0, 0, 0, 0);
-            const monthTrades = trades.filter(t =>
-                t.trade_time && new Date(t.trade_time) >= monthStart
-            );
+            const monthTrades = trades.filter(t => t.trade_time && new Date(t.trade_time) >= monthStart);
             const monthPnl = calcNetPnl(monthTrades);
 
-            // All-time PnL
             const allPnl = calcNetPnl(trades);
+            const closedTrades = trades.filter(t => t.exit_price);
+            const wins = closedTrades.filter(t => calcNetPnl([t]) > 0).length;
+            const winRate = closedTrades.length ? ((wins / closedTrades.length) * 100).toFixed(1) : 0;
 
-            // Win rate
-            const wins = trades.filter(t => calcNetPnl([t]) > 0).length;
-            const winRate = trades.length ? ((wins / trades.length) * 100).toFixed(1) : 0;
+            const avgPnl = closedTrades.length ? (allPnl / closedTrades.length) : 0;
 
             const cards = [
                 { label: 'Today PnL', value: todayPnl, sub: `${todayTrades.length} trades` },
                 { label: 'This Week', value: weekPnl, sub: `${weekTrades.length} trades` },
                 { label: 'This Month', value: monthPnl, sub: `${monthTrades.length} trades` },
                 { label: 'All Time', value: allPnl, sub: `${trades.length} trades` },
+                { label: 'Avg PnL', value: avgPnl, sub: `per trade` },
                 { label: 'Win Rate', value: winRate, sub: `${wins} wins`, isPercent: true }
             ];
 
             document.getElementById('pnlSummary').innerHTML = cards.map(c => {
                 const cls = c.isPercent ? '' : (c.value >= 0 ? 'pos' : 'neg');
-                const sign = c.isPercent ? '' : (c.value >= 0 ? '+' : '');
-                const display = c.isPercent ? `${c.value}%` : `${sign}${c.value.toFixed(2)}`;
+                const sign = c.isPercent ? '' : (c.value >= 0 ? '+' : '-');
+                const display = c.isPercent ? `${c.value}%` : `${sign}$${Math.abs(c.value).toFixed(2)}`;
                 return `
                     <div class="pnl-card">
                         <div class="label">${c.label}</div>
@@ -302,23 +593,13 @@
             }).join('');
         }
 
-        // Net PnL = PnL - fees - funding
-        function calcNetPnl(trades) {
-            return trades.reduce((sum, t) =>
-                sum + (t.pnl || 0) - (t.fee || 0) - (t.funding || 0), 0
-            );
-        }
-
-        // ---------- 2. 7-Day Chart ----------
         function renderChart(trades) {
             const days = [];
             for (let i = 6; i >= 0; i--) {
                 const d = new Date();
                 d.setDate(d.getDate() - i);
                 const dateKey = d.toISOString().split('T')[0];
-                const dayTrades = trades.filter(t =>
-                    t.trade_time && t.trade_time.startsWith(dateKey)
-                );
+                const dayTrades = trades.filter(t => t.trade_time && t.trade_time.startsWith(dateKey));
                 days.push({
                     date: dateKey,
                     label: d.toLocaleDateString('en-US', {day: 'numeric', month: 'short'}),
@@ -326,31 +607,30 @@
                 });
             }
 
-            const maxAbs = Math.max(...days.map(d => Math.abs(d.pnl)), 1);
+            const maxAbs = Math.max(...days.map(d => Math.abs(d.pnl)), 0.01);
 
             document.getElementById('chartBars').innerHTML = days.map(d => {
-                const heightPercent = (Math.abs(d.pnl) / maxAbs) * 80;
+                const heightPercent = (Math.abs(d.pnl) / maxAbs) * 85;
                 const cls = d.pnl >= 0 ? 'pos-bar' : 'neg-bar';
                 const valueColor = d.pnl >= 0 ? '#3fb950' : '#f85149';
-                const sign = d.pnl >= 0 ? '+' : '';
+                const sign = d.pnl >= 0 ? '+' : '-';
+                const displayVal = d.pnl !== 0 ? (sign + '$' + Math.abs(d.pnl).toFixed(2)) : '';
                 return `
-                    <div class="bar-wrapper">
+                    <div class="bar-wrapper" title="${d.label}: ${sign}$${Math.abs(d.pnl).toFixed(2)}">
                         <div class="bar-value" style="color:${valueColor};">
-                            ${d.pnl !== 0 ? sign + d.pnl.toFixed(0) : ''}
+                            ${displayVal}
                         </div>
-                        <div class="bar ${cls}" style="height: ${Math.max(heightPercent, 2)}%;"></div>
+                        <div class="bar ${cls}" style="height: ${Math.max(heightPercent, 3)}%;"></div>
                         <div class="bar-label">${d.label}</div>
                     </div>
                 `;
             }).join('');
         }
 
-        // ---------- 3. Trades List (date-wise) ----------
         function renderTrades(trades) {
             const container = document.getElementById('trades');
-
             if (!trades.length) {
-                container.innerHTML = '<div class="empty">No trades found.</div>';
+                container.innerHTML = '<div class="empty">No trades found. Click Sync to load trades.</div>';
                 return;
             }
 
@@ -365,23 +645,21 @@
 
             const sortedDates = Object.keys(groups).sort((a, b) => b.localeCompare(a));
 
-            container.innerHTML = sortedDates.map(date => {
+            container.innerHTML = sortedDates.map((date, idx) => {
                 const dayTrades = groups[date];
                 const dayPnl = calcNetPnl(dayTrades);
                 const dayFee = dayTrades.reduce((s, t) => s + (t.fee || 0), 0);
-                const dayFunding = dayTrades.reduce((s, t) => s + (t.funding || 0), 0);
                 const pnlClass = dayPnl >= 0 ? 'pos' : 'neg';
-                const pnlSign = dayPnl >= 0 ? '+' : '';
+                const pnlSign = dayPnl >= 0 ? '+' : '-';
 
                 return `
-                    <div class="date-group">
+                    <div class="date-group" style="animation-delay: ${idx * 0.05}s">
                         <div class="date-header">
                             <div class="date-title">📅 ${formatDate(date)}</div>
                             <div class="date-stats">
                                 <span>${dayTrades.length} trades</span>
-                                <span>Fee: ${dayFee.toFixed(2)}</span>
-                                <span>Funding: ${dayFunding.toFixed(2)}</span>
-                                <span class="${pnlClass}">Net: ${pnlSign}${dayPnl.toFixed(2)}</span>
+                                <span>Fee: $${dayFee.toFixed(2)}</span>
+                                <span class="${pnlClass}">Net: ${pnlSign}$${Math.abs(dayPnl).toFixed(2)}</span>
                             </div>
                         </div>
                         ${dayTrades.map(t => renderTradeCard(t)).join('')}
@@ -394,26 +672,66 @@
             const time = t.trade_time
                 ? new Date(t.trade_time).toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit'})
                 : '';
-            const netPnl = calcNetPnl([t]);
+            const isPending = !t.exit_price;
+            const netPnl = (t.pnl || 0) + (t.funding || 0) - (t.fee || 0);
             const pnlClass = netPnl >= 0 ? 'pos' : 'neg';
-            const pnlSign = netPnl >= 0 ? '+' : '';
+            const pnlSign = netPnl >= 0 ? '+' : '-';
 
             return `
                 <div class="trade-card">
                     <div class="trade-header">
-                        <span class="symbol">${t.symbol || 'N/A'} <span style="color:#8b949e;font-size:12px;font-weight:400;">${time}</span></span>
+                        <span class="symbol">
+                            ${t.symbol || 'N/A'} 
+                            <span style="color:#8b949e;font-size:11px;font-weight:400;">${time}</span>
+                            ${isPending ? '<span class="pending-badge">PENDING</span>' : ''}
+                        </span>
                         <span class="${t.side === 'buy' ? 'side-buy' : 'side-sell'}">
                             ${t.side === 'buy' ? '🟢 BUY' : '🔴 SELL'}
                         </span>
                     </div>
-                    <div class="meta">
-                        <span>Size: <strong>${t.size}</strong></span>
-                        <span>Entry: <strong>${t.entry_price}</strong></span>
-                        <span>Exit: <strong>${t.exit_price}</strong></span>
-                        <span>Fee: <strong>${(t.fee || 0).toFixed(2)}</strong></span>
-                        <span>Funding: <strong>${(t.funding || 0).toFixed(2)}</strong></span>
-                        <span class="${pnlClass}">Net: ${pnlSign}${netPnl.toFixed(2)}</span>
+
+                    <div class="auto-info">
+                        <div class="item">
+                            <span class="lbl">Entry</span>
+                            <span class="val">$${t.entry_price || '-'}</span>
+                        </div>
+                        <div class="item">
+                            <span class="lbl">Exit</span>
+                            <span class="val">${t.exit_price ? '$' + t.exit_price : '-'}</span>
+                        </div>
+                        <div class="item">
+                            <span class="lbl">Size</span>
+                            <span class="val">${t.size || '-'}</span>
+                        </div>
+                        <div class="item">
+                            <span class="lbl">Fee</span>
+                            <span class="val">$${(t.fee || 0).toFixed(4)}</span>
+                        </div>
+                        <div class="item">
+                            <span class="lbl">PnL</span>
+                            <span class="val ${pnlClass}">${isPending ? '-' : pnlSign + '$' + Math.abs(netPnl).toFixed(4)}</span>
+                        </div>
+                        <div class="item">
+                            <span class="lbl">Funding</span>
+                            <span class="val">$${(t.funding || 0).toFixed(4)}</span>
+                        </div>
                     </div>
+
+                    <div class="exit-row">
+                        <div class="input-box">
+                            <label>Exit Price ${isPending ? '(daalo!)' : ''}</label>
+                            <input type="number" step="0.01" value="${t.exit_price || ''}"
+                                class="${isPending ? 'highlight' : ''}"
+                                placeholder="Enter exit price"
+                                onblur="saveExit(${t.id}, this.value)">
+                        </div>
+                        <div class="input-box">
+                            <label>Net PnL</label>
+                            <input type="text" value="${isPending ? 'Pending' : pnlSign + '$' + Math.abs(netPnl).toFixed(4)}" readonly
+                                style="background:#161b22; color:${netPnl >= 0 ? '#3fb950' : '#f85149'}; font-weight:600;">
+                        </div>
+                    </div>
+
                     <textarea placeholder="Write your mistake or learning from this trade..."
                         onblur="saveNote(${t.id}, this.value)">${t.note || ''}</textarea>
                 </div>
@@ -436,12 +754,34 @@
             });
         }
 
+        async function saveExit(tradeId, exitPrice) {
+            if (!exitPrice || exitPrice === '') return;
+            const status = document.getElementById('status');
+            status.textContent = 'Calculating PnL...';
+
+            try {
+                const res = await fetch(`/api/trades/${tradeId}/exit`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({exit_price: parseFloat(exitPrice)})
+                });
+                if (!res.ok) {
+                    status.textContent = `Error: ${res.status}`;
+                    return;
+                }
+                status.textContent = '✓ PnL calculated';
+                loadTrades();
+                setTimeout(() => status.textContent = '', 2500);
+            } catch (e) {
+                status.textContent = `✗ ${e.message}`;
+            }
+        }
+
         function clearFilter() {
             document.getElementById('dateFilter').value = '';
             loadTrades();
         }
 
-        // ---------- 4. Export Functions ----------
         function exportCSV() {
             const date = document.getElementById('dateFilter').value;
             const url = date ? `/api/export/csv?date=${date}` : '/api/export/csv';
@@ -454,16 +794,21 @@
             window.location.href = url;
         }
 
-        // ---------- 5. Sync ----------
+        function exportPDF() {
+            const date = document.getElementById('dateFilter').value;
+            const url = date ? `/api/export/pdf?date=${date}` : '/api/export/pdf';
+            window.location.href = url;
+        }
+
         async function syncOrders() {
             const btn = document.getElementById('syncBtn');
             const status = document.getElementById('status');
             btn.disabled = true;
-            status.textContent = 'Syncing... (may take time for older orders)';
+            status.textContent = 'Syncing from Delta API...';
             try {
                 const res = await fetch('/api/sync', {method: 'POST'});
                 const data = await res.json();
-                status.textContent = `✓ ${data.synced} orders synced`;
+                status.textContent = `✓ ${data.synced} trades synced (${data.fills} fills grouped)`;
                 loadTrades();
             } catch (e) {
                 status.textContent = '✗ Sync failed';

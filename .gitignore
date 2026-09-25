@@ -5,3 +5,7 @@ __pycache__/
 *.log
 .venv/
 venv/
+.DS_Store
+*.xlsx
+*.pdf
+*.csv
