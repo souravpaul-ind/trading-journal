@@ -73,7 +73,88 @@ show_menu() {
 }
 
 # ============================================
-# PROJECT SETUP (Common)
+# AUTO-SYNC CRON SETUP (Called automatically)
+# ============================================
+setup_cron() {
+    echo -e "${YELLOW}Setting up auto-sync cron job (every 10 minutes)...${NC}"
+    
+    PROJECT_DIR=$(pwd)
+    BACKEND_DIR="$PROJECT_DIR/backend"
+    VENV_PYTHON="$PROJECT_DIR/venv/bin/python3"
+    LOG_FILE="$PROJECT_DIR/sync.log"
+
+    # Purana cron job hatao (agar hai)
+    crontab -l 2>/dev/null | grep -v "sync_cron.py" | crontab - 2>/dev/null || true
+
+    # Naya cron job add karo
+    (crontab -l 2>/dev/null; echo "*/10 * * * * cd $BACKEND_DIR && $VENV_PYTHON sync_cron.py >> $LOG_FILE 2>&1") | crontab -
+
+    echo -e "${GREEN}  ✓ Cron job added (every 10 minutes)${NC}"
+}
+
+# ============================================
+# CREATE sync_cron.py (Called automatically)
+# ============================================
+create_sync_script() {
+    if [ ! -f "backend/sync_cron.py" ]; then
+        echo -e "${YELLOW}Creating sync_cron.py...${NC}"
+        cat > backend/sync_cron.py <<'PYEOF'
+#!/usr/bin/env python3
+"""Automatic sync script - Cron job ke liye"""
+import asyncio
+import sys
+import os
+from datetime import datetime
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from delta_client import fetch_all_filled_orders, fetch_open_positions
+from database import (
+    group_fills_into_trades, add_grouped_trade,
+    add_open_position, remove_closed_open_positions
+)
+
+
+async def auto_sync():
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{timestamp}] Auto-sync started...")
+    try:
+        fills = await fetch_all_filled_orders()
+        grouped = group_fills_into_trades(fills)
+        removed = remove_closed_open_positions(grouped)
+        synced = 0
+        for trade in grouped:
+            try:
+                if add_grouped_trade(trade):
+                    synced += 1
+            except Exception as e:
+                print(f"  Trade skip: {e}")
+        open_positions = await fetch_open_positions()
+        open_count = 0
+        for pos in open_positions:
+            try:
+                if add_open_position(pos):
+                    open_count += 1
+            except Exception as e:
+                print(f"  Position skip: {e}")
+        print(f"[{timestamp}] Complete: {synced} synced, {open_count} open, {removed} removed")
+        return True
+    except Exception as e:
+        print(f"[{timestamp}] Failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+if __name__ == "__main__":
+    asyncio.run(auto_sync())
+PYEOF
+        echo -e "${GREEN}  ✓ sync_cron.py created${NC}"
+    fi
+}
+
+# ============================================
+# PROJECT SETUP
 # ============================================
 setup_project() {
     if [ ! -d "trading-journal" ]; then
@@ -87,15 +168,15 @@ setup_project() {
 # UBUNTU / DEBIAN
 # ============================================
 deploy_ubuntu() {
-    echo -e "${YELLOW}[1/6] Updating system...${NC}"
+    echo -e "${YELLOW}[1/7] Updating system...${NC}"
     sudo apt update -qq
-    sudo apt install -y -qq python3 python3-venv python3-pip git
+    sudo apt install -y -qq python3 python3-venv python3-pip git cron
 
-    echo -e "${YELLOW}[2/6] Setting up virtual environment...${NC}"
+    echo -e "${YELLOW}[2/7] Setting up virtual environment...${NC}"
     [ ! -d "venv" ] && python3 -m venv venv
     source venv/bin/activate
 
-    echo -e "${YELLOW}[3/6] Installing dependencies...${NC}"
+    echo -e "${YELLOW}[3/7] Installing dependencies...${NC}"
     pip install -q --upgrade pip
     pip install -q fastapi uvicorn httpx python-dotenv supabase openpyxl reportlab
 
@@ -113,7 +194,7 @@ deploy_ubuntu() {
         exit 1
     fi
 
-    echo -e "${YELLOW}[4/6] Setting up systemd service...${NC}"
+    echo -e "${YELLOW}[4/7] Setting up systemd service...${NC}"
     sudo tee /etc/systemd/system/journal.service > /dev/null <<EOF
 [Unit]
 Description=Trading Journal FastAPI
@@ -134,12 +215,17 @@ EOF
     sudo systemctl enable journal
     sudo systemctl restart journal
 
-    echo -e "${YELLOW}[5/6] Checking status...${NC}"
+    # Auto-setup sync script + cron
+    create_sync_script
+    setup_cron
+
+    echo -e "${YELLOW}[6/7] Checking status...${NC}"
     sleep 3
 
     if sudo systemctl is-active --quiet journal; then
-        echo -e "${GREEN}[6/6] ✓ Deploy Successful!${NC}"
+        echo -e "${GREEN}[7/7] ✓ Deploy Successful!${NC}"
         show_success
+        show_cron_info
     else
         echo -e "${RED}✗ Deploy Failed! Check logs: sudo journalctl -u journal -n 50${NC}"
         exit 1
@@ -153,11 +239,11 @@ deploy_linux() {
     echo -e "${YELLOW}[1/5] Installing Python and Git...${NC}"
     
     if command -v dnf &> /dev/null; then
-        sudo dnf install -y python3 python3-pip git
+        sudo dnf install -y python3 python3-pip git cronie
     elif command -v pacman &> /dev/null; then
-        sudo pacman -S --noconfirm python python-pip git
+        sudo pacman -S --noconfirm python python-pip git cronie
     elif command -v zypper &> /dev/null; then
-        sudo zypper install -y python3 python3-pip git
+        sudo zypper install -y python3 python3-pip git cron
     else
         echo -e "${RED}Cannot detect package manager!${NC}"
         exit 1
@@ -176,12 +262,22 @@ deploy_linux() {
         exit 1
     fi
 
-    echo -e "${YELLOW}[4/5] Starting server...${NC}"
+    echo -e "${YELLOW}[4/5] Enabling cron service...${NC}"
+    sudo systemctl enable crond 2>/dev/null || sudo systemctl enable cron 2>/dev/null || true
+    sudo systemctl start crond 2>/dev/null || sudo systemctl start cron 2>/dev/null || true
+
+    # Auto-setup sync script + cron
+    create_sync_script
+    setup_cron
+
+    echo -e "${YELLOW}[5/5] Done!${NC}"
     echo ""
-    echo -e "${GREEN}Run this command manually to start server:${NC}"
+    echo "Start server manually:"
     echo "  cd $(pwd)/backend"
     echo "  source ../venv/bin/activate"
     echo "  uvicorn main:app --host 0.0.0.0 --port 8000"
+    echo ""
+    echo "Auto-sync: every 10 minutes"
     echo ""
 }
 
@@ -211,6 +307,10 @@ deploy_mac() {
         exit 1
     fi
 
+    # Auto-setup sync script + cron
+    create_sync_script
+    setup_cron
+
     echo -e "${YELLOW}[5/5] Starting server...${NC}"
     cd backend
     uvicorn main:app --host 0.0.0.0 --port 8000
@@ -239,7 +339,24 @@ deploy_windows() {
         exit 1
     fi
 
-    echo -e "${YELLOW}[4/5] Starting server...${NC}"
+    # Auto-setup sync script
+    create_sync_script
+
+    echo -e "${YELLOW}[4/5] Windows Task Scheduler setup...${NC}"
+    echo ""
+    echo -e "${YELLOW}Windows pe cron nahi hota. Task Scheduler use karo:${NC}"
+    echo ""
+    echo "1. Open Task Scheduler (taskschd.msc)"
+    echo "2. Create Basic Task"
+    echo "3. Name: Trading Journal Sync"
+    echo "4. Trigger: Daily, repeat every 10 minutes"
+    echo "5. Action: Start a program"
+    echo "   Program: $(pwd)/venv/Scripts/python.exe"
+    echo "   Arguments: sync_cron.py"
+    echo "   Start in: $(pwd)/backend"
+    echo ""
+
+    echo -e "${YELLOW}[5/5] Starting server...${NC}"
     cd backend
     python -m uvicorn main:app --host 0.0.0.0 --port 8000
 }
@@ -266,6 +383,13 @@ deploy_windows_native() {
     echo "  cd backend"
     echo "  python -m uvicorn main:app --host 127.0.0.1 --port 8000"
     echo ""
+    echo "Step 4: Auto-sync setup (Task Scheduler):"
+    echo "  → Open taskschd.msc"
+    echo "  → Create Basic Task"
+    echo "  → Trigger: Daily, repeat every 10 minutes"
+    echo "  → Action: python.exe sync_cron.py"
+    echo "  → Start in: trading-journal/backend"
+    echo ""
 }
 
 # ============================================
@@ -280,9 +404,14 @@ check_status() {
     else
         echo -e "${RED}Service is not running.${NC}"
         echo ""
-        echo "Check if it's installed:"
         sudo systemctl status journal --no-pager 2>&1 | head -5 || echo "Service not found"
     fi
+    
+    echo ""
+    echo -e "${CYAN}Cron Job Status:${NC}"
+    echo ""
+    crontab -l 2>/dev/null | grep "sync_cron.py" || echo "No cron job found"
+    echo ""
 }
 
 restart_service() {
@@ -305,10 +434,9 @@ stop_service() {
         sudo systemctl stop journal
         sleep 1
         if sudo systemctl is-active --quiet journal; then
-            echo -e "${RED}✗ Service still running. Forcing stop...${NC}"
             sudo systemctl kill journal
         else
-            echo -e "${GREEN}✓ Service stopped successfully${NC}"
+            echo -e "${GREEN}✓ Service stopped${NC}"
         fi
     else
         echo -e "${YELLOW}Service is already stopped.${NC}"
@@ -328,88 +456,55 @@ view_logs() {
 # ============================================
 uninstall_service() {
     echo ""
-    echo -e "${RED}╔════════════════════════════════════════════╗"
-    echo "║   UNINSTALL - SERVICE ONLY                 ║"
-    echo -e "╚════════════════════════════════════════════╝${NC}"
-    echo ""
-    echo "This will:"
-    echo "  ✓ Stop the service"
-    echo "  ✓ Remove systemd service file"
-    echo "  ✓ Keep all project files"
+    echo -e "${RED}UNINSTALL - SERVICE ONLY${NC}"
     echo ""
     read -p "Are you sure? (yes/no): " CONFIRM
+    [ "$CONFIRM" != "yes" ] && echo "Cancelled." && return
     
-    if [ "$CONFIRM" != "yes" ]; then
-        echo "Cancelled."
-        return
-    fi
-    
-    echo ""
     echo -e "${YELLOW}[1/4] Stopping service...${NC}"
     sudo systemctl stop journal 2>/dev/null || echo "Service not running"
     
-    echo -e "${YELLOW}[2/4] Disabling service...${NC}"
-    sudo systemctl disable journal 2>/dev/null || echo "Service not enabled"
-    
-    echo -e "${YELLOW}[3/4] Removing service file...${NC}"
+    echo -e "${YELLOW}[2/4] Removing service + cron...${NC}"
+    sudo systemctl disable journal 2>/dev/null || true
     sudo rm -f /etc/systemd/system/journal.service
+    crontab -l 2>/dev/null | grep -v "sync_cron.py" | crontab - 2>/dev/null || true
     
-    echo -e "${YELLOW}[4/4] Reloading systemd...${NC}"
+    echo -e "${YELLOW}[3/4] Reloading systemd...${NC}"
     sudo systemctl daemon-reload
     sudo systemctl reset-failed 2>/dev/null || true
     
+    echo -e "${YELLOW}[4/4] Done${NC}"
     echo ""
-    echo -e "${GREEN}✓ Service uninstalled successfully${NC}"
-    echo ""
-    echo "Project files are still in: $(pwd)"
-    echo "To restart, run: bash deploy.sh (option 1)"
+    echo -e "${GREEN}✓ Service + cron uninstalled${NC}"
+    echo "Project files still in: $(pwd)"
     echo ""
 }
 
 full_uninstall() {
     echo ""
-    echo -e "${RED}╔════════════════════════════════════════════╗"
-    echo "║   FULL UNINSTALL - EVERYTHING              ║"
-    echo -e "╚════════════════════════════════════════════╝${NC}"
+    echo -e "${RED}FULL UNINSTALL - EVERYTHING${NC}"
     echo ""
     echo -e "${RED}WARNING: This will DELETE everything!${NC}"
     echo ""
-    echo "This will:"
-    echo "  ✓ Stop the service"
-    echo "  ✓ Remove systemd service file"
-    echo "  ✓ Delete virtual environment"
-    echo "  ✓ Delete all project files"
-    echo "  ✓ Remove from system"
-    echo ""
-    echo -e "${RED}THIS CANNOT BE UNDONE!${NC}"
-    echo ""
     read -p "Type 'DELETE' to confirm: " CONFIRM
+    [ "$CONFIRM" != "DELETE" ] && echo "Cancelled." && return
     
-    if [ "$CONFIRM" != "DELETE" ]; then
-        echo "Cancelled."
-        return
-    fi
+    echo -e "${YELLOW}[1/4] Stopping service...${NC}"
+    sudo systemctl stop journal 2>/dev/null || true
     
-    echo ""
-    echo -e "${YELLOW}[1/5] Stopping service...${NC}"
-    sudo systemctl stop journal 2>/dev/null || echo "Service not running"
-    
-    echo -e "${YELLOW}[2/5] Disabling service...${NC}"
-    sudo systemctl disable journal 2>/dev/null || echo "Service not enabled"
-    
-    echo -e "${YELLOW}[3/5] Removing service file...${NC}"
+    echo -e "${YELLOW}[2/4] Removing service + cron...${NC}"
+    sudo systemctl disable journal 2>/dev/null || true
     sudo rm -f /etc/systemd/system/journal.service
+    crontab -l 2>/dev/null | grep -v "sync_cron.py" | crontab - 2>/dev/null || true
     sudo systemctl daemon-reload
     sudo systemctl reset-failed 2>/dev/null || true
     
-    echo -e "${YELLOW}[4/5] Finding project directory...${NC}"
+    echo -e "${YELLOW}[3/4] Project directory:${NC}"
     PROJECT_DIR=$(pwd)
-    echo "Project directory: $PROJECT_DIR"
+    echo "$PROJECT_DIR"
     
-    echo -e "${YELLOW}[5/5] Deleting project files...${NC}"
+    echo -e "${YELLOW}[4/4] Deleting project files...${NC}"
     cd ~
-    
-    # Confirm before deleting
     read -p "Delete '$PROJECT_DIR'? (yes/no): " CONFIRM2
     if [ "$CONFIRM2" == "yes" ]; then
         rm -rf "$PROJECT_DIR"
@@ -424,7 +519,7 @@ full_uninstall() {
 }
 
 # ============================================
-# SUCCESS MESSAGE
+# SUCCESS MESSAGES
 # ============================================
 show_success() {
     echo ""
@@ -441,6 +536,16 @@ show_success() {
     echo "  Stop:    sudo systemctl stop journal"
     echo ""
     echo "Next: Open http://YOUR_SERVER_IP:8000"
+    echo ""
+}
+
+show_cron_info() {
+    echo -e "${CYAN}╔════════════════════════════════════════════╗"
+    echo "║   AUTO-SYNC ACTIVE                         ║"
+    echo -e "╚════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo "Auto-sync: Every 10 minutes"
+    echo "Logs:      tail -f $(pwd)/sync.log"
     echo ""
 }
 

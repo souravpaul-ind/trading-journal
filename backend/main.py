@@ -14,15 +14,14 @@ from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-
+from delta_client import fetch_all_filled_orders, fetch_open_positions
 from database import (
     init_db, get_trades, update_note,
     update_exit_price, delete_all_trades,
     group_fills_into_trades, add_grouped_trade,
+    add_open_position, remove_closed_open_positions,
     supabase, TABLE
 )
-from delta_client import fetch_all_filled_orders
-
 app = FastAPI(title="Trading Journal")
 
 init_db()
@@ -49,8 +48,15 @@ def list_trades(date: Optional[str] = Query(None)):
 
 @app.post("/api/sync")
 async def sync_orders():
+    """Delta se fills + open positions fetch karta hai"""
+    # 1. Closed trades (fills se)
     fills = await fetch_all_filled_orders()
     grouped = group_fills_into_trades(fills)
+    
+    # 2. Open positions ko check karo aur closed wale remove karo
+    removed = remove_closed_open_positions(grouped)
+    
+    # 3. Grouped trades save karo
     synced = 0
     for trade in grouped:
         try:
@@ -58,8 +64,24 @@ async def sync_orders():
                 synced += 1
         except Exception as e:
             print(f"Trade skip: {e}")
-    return {"synced": synced, "fills": len(fills), "trades": len(grouped)}
-
+    
+    # 4. Current open positions add karo
+    open_positions = await fetch_open_positions()
+    open_count = 0
+    for pos in open_positions:
+        try:
+            if add_open_position(pos):
+                open_count += 1
+        except Exception as e:
+            print(f"Open position skip: {e}")
+    
+    return {
+        "synced": synced,
+        "fills": len(fills),
+        "trades": len(grouped),
+        "open_positions": open_count,
+        "removed_closed": removed
+    }
 
 @app.put("/api/trades/{trade_id}/note")
 def save_note(trade_id: int, body: NoteUpdate):

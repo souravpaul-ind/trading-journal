@@ -106,3 +106,34 @@ def get_contract_value(symbol):
         values = loop.run_until_complete(fetch_contract_values_async())
 
     return values.get(symbol, 1.0)
+
+async def fetch_open_positions():
+    """Delta se open positions fetch karta hai"""
+    all_positions = []
+    symbols = ['BTC', 'ETH', 'XAU', 'SOL', 'XRP']
+    
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        for symbol in symbols:
+            try:
+                method = "GET"
+                endpoint = "/v2/positions"
+                query_string = f"?underlying_asset_symbol={symbol}"
+                signature, timestamp = generate_signature(method, endpoint, query_string)
+
+                headers = {
+                    "api-key": API_KEY,
+                    "signature": signature,
+                    "timestamp": timestamp,
+                    "User-Agent": "TradingJournal/1.0"
+                }
+
+                resp = await client.get(BASE_URL + endpoint + query_string, headers=headers)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    positions = data.get("result", [])
+                    all_positions.extend(positions)
+            except Exception as e:
+                print(f"{symbol} positions error: {e}")
+                continue
+    
+    return all_positions

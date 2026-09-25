@@ -176,3 +176,63 @@ def update_exit_price(trade_id, exit_price):
 
 def delete_all_trades():
     supabase.table(TABLE).delete().neq("id", 0).execute()
+def add_open_position(pos):
+    """Open position ko Supabase mein 'PENDING' trade ki tarah daalta hai."""
+    pos_id = pos.get("product_id")
+    symbol = pos.get("product_symbol")
+    size = float(pos.get("size", 0) or 0)
+    entry_price = float(pos.get("entry_price", 0) or 0)
+    user_id = pos.get("user_id")
+    
+    if not symbol or size == 0:
+        return False
+    
+    # Size positive = long (buy), negative = short (sell)
+    side = "buy" if size > 0 else "sell"
+    unique_id = f"open_pos_{user_id}_{pos_id}"
+    
+    data = {
+        "delta_order_id": unique_id,
+        "symbol": symbol,
+        "side": side,
+        "size": abs(size),
+        "entry_price": entry_price,
+        "exit_price": None,
+        "pnl": 0,
+        "fee": 0,
+        "funding": 0,
+        "trade_time": None,
+        "note": ""
+    }
+    
+    try:
+        supabase.table(TABLE).upsert(data, on_conflict="delta_order_id").execute()
+        return True
+    except Exception as e:
+        print(f"Open position error: {e}")
+        return False
+
+def remove_closed_open_positions(grouped_trades):
+    """Open positions ko remove karta hai agar unka grouped trade aa gaya ho.
+    Jab position close hoti hai, to fills se grouped trade ban jati hai.
+    Us waqt open position ka 'PENDING' record delete kar dena chahiye."""
+    # Saare open positions lo
+    res = supabase.table(TABLE).select("id, symbol, side, delta_order_id").like("delta_order_id", "open_pos_%").execute()
+    
+    if not res.data:
+        return 0
+    
+    removed = 0
+    for open_pos in res.data:
+        symbol = open_pos.get("symbol")
+        side = open_pos.get("side")
+        
+        # Check karo ki is symbol ka koi grouped trade aaya hai kya
+        for trade in grouped_trades:
+            if trade["symbol"] == symbol and trade["entry_side"] == side:
+                # Open position mila — delete karo
+                supabase.table(TABLE).delete().eq("id", open_pos["id"]).execute()
+                removed += 1
+                break
+    
+    return removed

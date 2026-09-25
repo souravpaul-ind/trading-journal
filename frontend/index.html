@@ -89,6 +89,7 @@
             max-width: 180px;
             text-align: center;
             cursor: pointer;
+            position: relative;
         }
         input[type="date"]#dateFilter:hover { 
             border-color: #484f58; 
@@ -98,9 +99,23 @@
             border-color: var(--blue);
             box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
         }
-        input[type="date"]#dateFilter:not(:focus):invalid::-webkit-datetime-edit {
-            color: rgba(139, 148, 158, 0.55);
+
+        input[type="date"]#dateFilter.empty-date::-webkit-datetime-edit {
+            color: transparent;
         }
+        input[type="date"]#dateFilter.empty-date::before {
+            content: "dd/mm/yyyy";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: rgba(139, 148, 158, 0.55);
+            pointer-events: none;
+            font-size: 13.5px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            z-index: 1;
+        }
+
         input[type="date"]#dateFilter::-webkit-calendar-picker-indicator {
             cursor: pointer;
             filter: invert(0.8);
@@ -204,7 +219,6 @@
         .pos { color: var(--green); }
         .neg { color: var(--red); }
 
-        /* Chart container */
         .chart-container {
             background: linear-gradient(135deg, #161b22 0%, #1a1f26 100%);
             border: 1px solid var(--border);
@@ -221,7 +235,6 @@
             font-weight: 600;
             text-align: center;
         }
-        /* Chart bars - proper height for bars to show */
         .chart-bars {
             display: flex;
             align-items: flex-end;
@@ -328,7 +341,10 @@
         .trade-header {
             display: flex;
             justify-content: space-between;
+            align-items: center;
             margin-bottom: 10px;
+            flex-wrap: wrap;
+            gap: 4px;
         }
         .symbol { 
             font-weight: 700; 
@@ -466,8 +482,9 @@
             border-bottom: 1px solid var(--border);
             letter-spacing: -0.2px;
         }
-        .pending-badge {
-            background: linear-gradient(135deg, #9e6a03 0%, #bb8009 100%);
+
+        .open-badge {
+            background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
             color: #fff;
             font-size: 9px;
             padding: 2px 7px;
@@ -476,6 +493,17 @@
             font-weight: 600;
             letter-spacing: 0.3px;
             animation: pulse 2s ease infinite;
+        }
+
+        .close-badge {
+            background: linear-gradient(135deg, #da3633 0%, #f85149 100%);
+            color: #fff;
+            font-size: 9px;
+            padding: 2px 7px;
+            border-radius: 10px;
+            margin-left: 6px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
         }
 
         @media (max-width: 480px) {
@@ -497,6 +525,9 @@
                 max-width: 150px; 
                 padding: 9px 10px; 
                 font-size: 12px; 
+            }
+            input[type="date"]#dateFilter.empty-date::before {
+                font-size: 12px;
             }
             .chart-title { font-size: 11.5px; margin-bottom: 6px; }
             .chart-bars { height: 120px; padding-top: 18px; }
@@ -530,6 +561,15 @@
     <script>
         let allTrades = [];
 
+        function updateDatePlaceholder() {
+            const dateInput = document.getElementById('dateFilter');
+            if (dateInput.value) {
+                dateInput.classList.remove('empty-date');
+            } else {
+                dateInput.classList.add('empty-date');
+            }
+        }
+
         async function loadTrades() {
             const date = document.getElementById('dateFilter').value;
             const url = date ? `/api/trades?date=${date}` : '/api/trades';
@@ -538,6 +578,7 @@
             renderSummary(allTrades);
             renderChart(allTrades);
             renderTrades(allTrades);
+            updateDatePlaceholder();
         }
 
         function calcNetPnl(trades) {
@@ -638,12 +679,16 @@
             trades.forEach(t => {
                 const dateKey = t.trade_time
                     ? new Date(t.trade_time).toISOString().split('T')[0]
-                    : 'Unknown';
+                    : 'PENDING';
                 if (!groups[dateKey]) groups[dateKey] = [];
                 groups[dateKey].push(t);
             });
 
-            const sortedDates = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+            const sortedDates = Object.keys(groups).sort((a, b) => {
+                if (a === 'PENDING') return -1;
+                if (b === 'PENDING') return 1;
+                return b.localeCompare(a);
+            });
 
             container.innerHTML = sortedDates.map((date, idx) => {
                 const dayTrades = groups[date];
@@ -651,15 +696,18 @@
                 const dayFee = dayTrades.reduce((s, t) => s + (t.fee || 0), 0);
                 const pnlClass = dayPnl >= 0 ? 'pos' : 'neg';
                 const pnlSign = dayPnl >= 0 ? '+' : '-';
+                const dateLabel = date === 'PENDING' ? '⏳ Open Positions' : `📅 ${formatDate(date)}`;
 
                 return `
                     <div class="date-group" style="animation-delay: ${idx * 0.05}s">
                         <div class="date-header">
-                            <div class="date-title">📅 ${formatDate(date)}</div>
+                            <div class="date-title">${dateLabel}</div>
                             <div class="date-stats">
                                 <span>${dayTrades.length} trades</span>
-                                <span>Fee: $${dayFee.toFixed(2)}</span>
-                                <span class="${pnlClass}">Net: ${pnlSign}$${Math.abs(dayPnl).toFixed(2)}</span>
+                                ${date !== 'PENDING' ? `
+                                    <span>Fee: $${dayFee.toFixed(2)}</span>
+                                    <span class="${pnlClass}">Net: ${pnlSign}$${Math.abs(dayPnl).toFixed(2)}</span>
+                                ` : ''}
                             </div>
                         </div>
                         ${dayTrades.map(t => renderTradeCard(t)).join('')}
@@ -672,7 +720,8 @@
             const time = t.trade_time
                 ? new Date(t.trade_time).toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit'})
                 : '';
-            const isPending = !t.exit_price;
+            const isOpen = !t.trade_time || (t.delta_order_id && t.delta_order_id.startsWith('open_pos_'));
+            const isClosed = !isOpen;
             const netPnl = (t.pnl || 0) + (t.funding || 0) - (t.fee || 0);
             const pnlClass = netPnl >= 0 ? 'pos' : 'neg';
             const pnlSign = netPnl >= 0 ? '+' : '-';
@@ -682,8 +731,9 @@
                     <div class="trade-header">
                         <span class="symbol">
                             ${t.symbol || 'N/A'} 
-                            <span style="color:#8b949e;font-size:11px;font-weight:400;">${time}</span>
-                            ${isPending ? '<span class="pending-badge">PENDING</span>' : ''}
+                            ${time ? `<span style="color:#8b949e;font-size:11px;font-weight:400;">${time}</span>` : ''}
+                            ${isOpen ? '<span class="open-badge">OPEN</span>' : ''}
+                            ${isClosed ? '<span class="close-badge">CLOSE</span>' : ''}
                         </span>
                         <span class="${t.side === 'buy' ? 'side-buy' : 'side-sell'}">
                             ${t.side === 'buy' ? '🟢 BUY' : '🔴 SELL'}
@@ -709,7 +759,7 @@
                         </div>
                         <div class="item">
                             <span class="lbl">PnL</span>
-                            <span class="val ${pnlClass}">${isPending ? '-' : pnlSign + '$' + Math.abs(netPnl).toFixed(4)}</span>
+                            <span class="val ${pnlClass}">${isOpen ? '-' : pnlSign + '$' + Math.abs(netPnl).toFixed(4)}</span>
                         </div>
                         <div class="item">
                             <span class="lbl">Funding</span>
@@ -719,15 +769,15 @@
 
                     <div class="exit-row">
                         <div class="input-box">
-                            <label>Exit Price ${isPending ? '(daalo!)' : ''}</label>
+                            <label>Exit Price</label>
                             <input type="number" step="0.01" value="${t.exit_price || ''}"
-                                class="${isPending ? 'highlight' : ''}"
+                                class="${isOpen ? 'highlight' : ''}"
                                 placeholder="Enter exit price"
                                 onblur="saveExit(${t.id}, this.value)">
                         </div>
                         <div class="input-box">
                             <label>Net PnL</label>
-                            <input type="text" value="${isPending ? 'Pending' : pnlSign + '$' + Math.abs(netPnl).toFixed(4)}" readonly
+                            <input type="text" value="${isOpen ? 'Pending' : pnlSign + '$' + Math.abs(netPnl).toFixed(4)}" readonly
                                 style="background:#161b22; color:${netPnl >= 0 ? '#3fb950' : '#f85149'}; font-weight:600;">
                         </div>
                     </div>
@@ -739,7 +789,7 @@
         }
 
         function formatDate(dateStr) {
-            if (dateStr === 'Unknown') return 'Unknown Date';
+            if (dateStr === 'Unknown' || dateStr === 'PENDING') return dateStr;
             const d = new Date(dateStr + 'T00:00:00');
             return d.toLocaleDateString('en-US', {
                 day: 'numeric', month: 'short', year: 'numeric', weekday: 'long'
@@ -779,6 +829,7 @@
 
         function clearFilter() {
             document.getElementById('dateFilter').value = '';
+            updateDatePlaceholder();
             loadTrades();
         }
 
@@ -808,7 +859,14 @@
             try {
                 const res = await fetch('/api/sync', {method: 'POST'});
                 const data = await res.json();
-                status.textContent = `✓ ${data.synced} trades synced (${data.fills} fills grouped)`;
+                let msg = `✓ ${data.synced} trades synced`;
+                if (data.open_positions) {
+                    msg += `, ${data.open_positions} open`;
+                }
+                if (data.removed_closed) {
+                    msg += `, ${data.removed_closed} closed removed`;
+                }
+                status.textContent = msg;
                 loadTrades();
             } catch (e) {
                 status.textContent = '✗ Sync failed';
@@ -817,7 +875,18 @@
             setTimeout(() => status.textContent = '', 5000);
         }
 
+        document.getElementById('dateFilter').addEventListener('change', function() {
+            updateDatePlaceholder();
+            loadTrades();
+        });
+        document.getElementById('dateFilter').addEventListener('blur', updateDatePlaceholder);
+
+        // Initial load
         loadTrades();
+        updateDatePlaceholder();
+
+        // Auto-refresh every 2 minutes
+        setInterval(loadTrades, 120000);
     </script>
 </body>
 </html>
