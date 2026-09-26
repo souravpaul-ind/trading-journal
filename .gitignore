@@ -10,3 +10,6 @@ venv/
 *.pdf
 *.csv
 sync.log
+*.pem
+*.key
+.env.*

@@ -59,12 +59,45 @@
             from { transform: scaleY(0); }
             to { transform: scaleY(1); }
         }
-        @keyframes shimmer {
-            0% { background-position: -200% 0; }
-            100% { background-position: 200% 0; }
+
+        /* Logout button - fixed position top right of viewport */
+        .logout-circle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: rgba(248, 81, 73, 0.15);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(248, 81, 73, 0.4);
+            color: #f85149;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            padding: 0;
+            box-shadow: 0 0 12px rgba(248, 81, 73, 0.2);
+            z-index: 9999;
+            font-family: inherit;
+        }
+        .logout-circle:hover {
+            background: rgba(248, 81, 73, 0.9);
+            color: #fff;
+            transform: scale(1.1);
+            box-shadow: 0 4px 24px rgba(248, 81, 73, 0.5);
+            border-color: rgba(248, 81, 73, 0.9);
+        }
+        .logout-circle:active {
+            transform: scale(0.95);
+        }
+        .logout-circle svg {
+            width: 20px;
+            height: 20px;
         }
 
-        /* Header */
         header {
             display: flex;
             flex-direction: column;
@@ -73,6 +106,7 @@
             gap: 8px;
             animation: fadeIn 0.5s ease;
             text-align: center;
+            width: 100%;
         }
         h1 { 
             font-size: 2.2rem; 
@@ -92,7 +126,6 @@
             font-weight: 400;
         }
 
-        /* Controls */
         .controls { 
             display: flex; 
             gap: 8px; 
@@ -103,7 +136,6 @@
             margin-top: 12px;
         }
 
-        /* Date input */
         input[type="date"]#dateFilter {
             background: var(--glass);
             backdrop-filter: blur(12px);
@@ -155,7 +187,6 @@
             opacity: 1;
         }
 
-        /* Buttons */
         button {
             background: rgba(35, 134, 54, 0.8);
             backdrop-filter: blur(12px);
@@ -221,7 +252,6 @@
             border-color: rgba(248, 81, 73, 0.6);
         }
 
-        /* Summary cards */
         .pnl-summary {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -281,7 +311,6 @@
         .pos { color: var(--green); text-shadow: 0 0 12px var(--green-glow); }
         .neg { color: var(--red); text-shadow: 0 0 12px var(--red-glow); }
 
-        /* Chart */
         .chart-container {
             background: var(--card);
             backdrop-filter: blur(16px);
@@ -378,7 +407,6 @@
             white-space: nowrap;
         }
 
-        /* Date group */
         .date-group { 
             margin-bottom: 22px;
             animation: fadeIn 0.4s ease backwards;
@@ -408,7 +436,6 @@
             font-weight: 500;
         }
 
-        /* Trade card */
         .trade-card {
             background: var(--card);
             backdrop-filter: blur(16px);
@@ -606,6 +633,8 @@
         @media (max-width: 480px) {
             body { padding: 14px 12px; }
             h1 { font-size: 1.8rem; }
+            .logout-circle { width: 38px; height: 38px; top: 14px; right: 14px; }
+            .logout-circle svg { width: 18px; height: 18px; }
             .pnl-summary { grid-template-columns: repeat(3, 1fr); gap: 8px; }
             .pnl-card { padding: 11px; }
             .pnl-card .value { font-size: 1rem; }
@@ -617,21 +646,25 @@
             .bar-value { font-size: 9px; }
             button { padding: 10px 14px; font-size: 12px; }
             input[type="date"]#dateFilter { 
-                width: 150px; 
-                min-width: 150px; 
-                max-width: 150px; 
-                padding: 10px 10px; 
-                font-size: 12px; 
+                width: 150px; min-width: 150px; max-width: 150px; 
+                padding: 10px 10px; font-size: 12px; 
             }
-            input[type="date"]#dateFilter.empty-date::before {
-                font-size: 12px;
-            }
+            input[type="date"]#dateFilter.empty-date::before { font-size: 12px; }
             .chart-title { font-size: 12px; }
             .chart-bars { height: 120px; padding-top: 18px; }
         }
     </style>
 </head>
 <body>
+    <!-- Fixed logout button - top right of viewport -->
+    <button class="logout-circle" onclick="logout()" title="Logout">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+        </svg>
+    </button>
+
     <header>
         <h1>Trading Journal</h1>
         <div class="subtitle">Track your trades with precision</div>
@@ -671,7 +704,13 @@
         async function loadTrades() {
             const date = document.getElementById('dateFilter').value;
             const url = date ? `/api/trades?date=${date}` : '/api/trades';
-            const res = await fetch(url);
+            const res = await fetch(url, { credentials: 'include' });
+            
+            if (res.status === 401) {
+                window.location.href = '/login';
+                return;
+            }
+            
             allTrades = await res.json();
             renderSummary(allTrades);
             renderChart(allTrades);
@@ -706,7 +745,6 @@
             const closedTrades = trades.filter(t => t.exit_price);
             const wins = closedTrades.filter(t => calcNetPnl([t]) > 0).length;
             const winRate = closedTrades.length ? ((wins / closedTrades.length) * 100).toFixed(1) : 0;
-
             const avgPnl = closedTrades.length ? (allPnl / closedTrades.length) : 0;
 
             const cards = [
@@ -756,9 +794,7 @@
                 const displayVal = d.pnl !== 0 ? (sign + '$' + Math.abs(d.pnl).toFixed(2)) : '';
                 return `
                     <div class="bar-wrapper" title="${d.label}: ${sign}$${Math.abs(d.pnl).toFixed(2)}">
-                        <div class="bar-value" style="color:${valueColor};">
-                            ${displayVal}
-                        </div>
+                        <div class="bar-value" style="color:${valueColor};">${displayVal}</div>
                         <div class="bar ${cls}" style="height: ${Math.max(heightPercent, 3)}%;"></div>
                         <div class="bar-label">${d.label}</div>
                     </div>
@@ -839,30 +875,12 @@
                     </div>
 
                     <div class="auto-info">
-                        <div class="item">
-                            <span class="lbl">Entry</span>
-                            <span class="val">$${t.entry_price || '-'}</span>
-                        </div>
-                        <div class="item">
-                            <span class="lbl">Exit</span>
-                            <span class="val">${t.exit_price ? '$' + t.exit_price : '-'}</span>
-                        </div>
-                        <div class="item">
-                            <span class="lbl">Size</span>
-                            <span class="val">${t.size || '-'}</span>
-                        </div>
-                        <div class="item">
-                            <span class="lbl">Fee</span>
-                            <span class="val">$${(t.fee || 0).toFixed(4)}</span>
-                        </div>
-                        <div class="item">
-                            <span class="lbl">PnL</span>
-                            <span class="val ${pnlClass}">${isOpen ? '-' : pnlSign + '$' + Math.abs(netPnl).toFixed(4)}</span>
-                        </div>
-                        <div class="item">
-                            <span class="lbl">Funding</span>
-                            <span class="val">$${(t.funding || 0).toFixed(4)}</span>
-                        </div>
+                        <div class="item"><span class="lbl">Entry</span><span class="val">$${t.entry_price || '-'}</span></div>
+                        <div class="item"><span class="lbl">Exit</span><span class="val">${t.exit_price ? '$' + t.exit_price : '-'}</span></div>
+                        <div class="item"><span class="lbl">Size</span><span class="val">${t.size || '-'}</span></div>
+                        <div class="item"><span class="lbl">Fee</span><span class="val">$${(t.fee || 0).toFixed(4)}</span></div>
+                        <div class="item"><span class="lbl">PnL</span><span class="val ${pnlClass}">${isOpen ? '-' : pnlSign + '$' + Math.abs(netPnl).toFixed(4)}</span></div>
+                        <div class="item"><span class="lbl">Funding</span><span class="val">$${(t.funding || 0).toFixed(4)}</span></div>
                     </div>
 
                     <div class="exit-row">
@@ -889,15 +907,14 @@
         function formatDate(dateStr) {
             if (dateStr === 'Unknown' || dateStr === 'PENDING') return dateStr;
             const d = new Date(dateStr + 'T00:00:00');
-            return d.toLocaleDateString('en-US', {
-                day: 'numeric', month: 'short', year: 'numeric', weekday: 'long'
-            });
+            return d.toLocaleDateString('en-US', {day: 'numeric', month: 'short', year: 'numeric', weekday: 'long'});
         }
 
         async function saveNote(tradeId, note) {
             await fetch(`/api/trades/${tradeId}/note`, {
                 method: 'PUT',
                 headers: {'Content-Type': 'application/json'},
+                credentials: 'include',
                 body: JSON.stringify({note})
             });
         }
@@ -906,17 +923,14 @@
             if (!exitPrice || exitPrice === '') return;
             const status = document.getElementById('status');
             status.textContent = 'Calculating PnL...';
-
             try {
                 const res = await fetch(`/api/trades/${tradeId}/exit`, {
                     method: 'PUT',
                     headers: {'Content-Type': 'application/json'},
+                    credentials: 'include',
                     body: JSON.stringify({exit_price: parseFloat(exitPrice)})
                 });
-                if (!res.ok) {
-                    status.textContent = `Error: ${res.status}`;
-                    return;
-                }
+                if (!res.ok) { status.textContent = `Error: ${res.status}`; return; }
                 status.textContent = '✓ PnL calculated';
                 loadTrades();
                 setTimeout(() => status.textContent = '', 2500);
@@ -933,20 +947,17 @@
 
         function exportCSV() {
             const date = document.getElementById('dateFilter').value;
-            const url = date ? `/api/export/csv?date=${date}` : '/api/export/csv';
-            window.location.href = url;
+            window.location.href = date ? `/api/export/csv?date=${date}` : '/api/export/csv';
         }
 
         function exportExcel() {
             const date = document.getElementById('dateFilter').value;
-            const url = date ? `/api/export/excel?date=${date}` : '/api/export/excel';
-            window.location.href = url;
+            window.location.href = date ? `/api/export/excel?date=${date}` : '/api/export/excel';
         }
 
         function exportPDF() {
             const date = document.getElementById('dateFilter').value;
-            const url = date ? `/api/export/pdf?date=${date}` : '/api/export/pdf';
-            window.location.href = url;
+            window.location.href = date ? `/api/export/pdf?date=${date}` : '/api/export/pdf';
         }
 
         async function syncOrders() {
@@ -955,7 +966,10 @@
             btn.disabled = true;
             status.textContent = 'Syncing from Delta API...';
             try {
-                const res = await fetch('/api/sync', {method: 'POST'});
+                const res = await fetch('/api/sync', {
+                    method: 'POST',
+                    credentials: 'include'
+                });
                 const data = await res.json();
                 let msg = `✓ ${data.synced} trades synced`;
                 if (data.open_positions) msg += `, ${data.open_positions} open`;
@@ -967,6 +981,10 @@
             }
             btn.disabled = false;
             setTimeout(() => status.textContent = '', 5000);
+        }
+
+        function logout() {
+            window.location.href = '/logout';
         }
 
         document.getElementById('dateFilter').addEventListener('change', function() {

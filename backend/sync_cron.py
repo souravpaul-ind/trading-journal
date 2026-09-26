@@ -20,21 +20,21 @@ async def auto_sync():
     """Delta se data fetch karke Supabase mein save karta hai"""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"[{timestamp}] Auto-sync started...")
-    
+
     try:
         # 1. Fills fetch karo
         fills = await fetch_all_filled_orders()
-        print(f"  → {len(fills)} fills fetched")
-        
+        print(f"  -> {len(fills)} fills fetched")
+
         # 2. Grouped trades banao
         grouped = group_fills_into_trades(fills)
-        print(f"  → {len(grouped)} grouped trades")
-        
+        print(f"  -> {len(grouped)} grouped trades")
+
         # 3. Closed open positions remove karo
         removed = remove_closed_open_positions(grouped)
         if removed:
-            print(f"  → {removed} closed positions removed")
-        
+            print(f"  -> {removed} closed positions removed")
+
         # 4. Grouped trades save karo
         synced = 0
         for trade in grouped:
@@ -42,9 +42,9 @@ async def auto_sync():
                 if add_grouped_trade(trade):
                     synced += 1
             except Exception as e:
-                print(f"  ✗ Trade skip: {e}")
-        print(f"  → {synced} trades synced")
-        
+                print(f"  X Trade skip: {e}")
+        print(f"  -> {synced} trades synced")
+
         # 5. Open positions add karo
         open_positions = await fetch_open_positions()
         open_count = 0
@@ -53,14 +53,14 @@ async def auto_sync():
                 if add_open_position(pos):
                     open_count += 1
             except Exception as e:
-                print(f"  ✗ Position skip: {e}")
-        print(f"  → {open_count} open positions")
-        
-        print(f"[{timestamp}] ✓ Auto-sync complete")
+                print(f"  X Position skip: {e}")
+        print(f"  -> {open_count} open positions")
+
+        print(f"[{timestamp}] / Auto-sync complete")
         return True
-        
+
     except Exception as e:
-        print(f"[{timestamp}] ✗ Auto-sync failed: {e}")
+        print(f"[{timestamp}] X Auto-sync failed: {e}")
         import traceback
         traceback.print_exc()
         return False
