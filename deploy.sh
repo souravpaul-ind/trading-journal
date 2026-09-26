@@ -73,7 +73,79 @@ show_menu() {
 }
 
 # ============================================
-# AUTO-SYNC CRON SETUP (Called automatically)
+# TAILSCALE AUTO-SETUP (Called automatically)
+# ============================================
+setup_tailscale_auto() {
+    echo ""
+    echo -e "${CYAN}═══════════════════════════════════════════${NC}"
+    echo -e "${CYAN}  TAILSCALE FUNNEL SETUP (Free HTTPS)${NC}"
+    echo -e "${CYAN}═══════════════════════════════════════════${NC}"
+    echo ""
+
+    # Check if already installed
+    if command -v tailscale &> /dev/null; then
+        echo -e "${GREEN}✓ Tailscale already installed${NC}"
+    else
+        echo -e "${YELLOW}Installing Tailscale...${NC}"
+        curl -fsSL https://tailscale.com/install.sh | sh
+        echo -e "${GREEN}✓ Tailscale installed${NC}"
+    fi
+
+    echo ""
+    echo -e "${YELLOW}Logging in to Tailscale...${NC}"
+    echo ""
+    echo -e "${CYAN}IMPORTANT:${NC}"
+    echo "  • Ek URL aayega — browser mein kholo"
+    echo "  • Login karo (Google/GitHub/Microsoft)"
+    echo "  • Authorize karo"
+    echo "  • Terminal mein wapas aao"
+    echo ""
+    read -p "Press Enter to continue..."
+
+    sudo tailscale up
+
+    echo ""
+    echo -e "${GREEN}✓ Tailscale connected${NC}"
+
+    echo ""
+    echo -e "${YELLOW}Enabling Funnel (admin console)...${NC}"
+    echo ""
+    echo -e "${CYAN}MANUAL STEP REQUIRED:${NC}"
+    echo "  1. Open: https://login.tailscale.com/admin/settings/features"
+    echo "  2. Find 'Funnel' section"
+    echo "  3. Click 'Enable Funnel'"
+    echo ""
+    read -p "Done? Press Enter to continue..."
+
+    echo ""
+    echo -e "${YELLOW}Starting Funnel on port 8000...${NC}"
+    sudo tailscale funnel --bg 8000
+
+    sleep 3
+
+    echo ""
+    echo -e "${YELLOW}Getting your HTTPS URL...${NC}"
+    FUNNEL_STATUS=$(sudo tailscale funnel status 2>/dev/null)
+
+    if echo "$FUNNEL_STATUS" | grep -q "https://"; then
+        FUNNEL_URL=$(echo "$FUNNEL_STATUS" | grep -oP 'https://[^\s]+' | head -1)
+        echo ""
+        echo -e "${GREEN}╔════════════════════════════════════════════╗"
+        echo "║   ✓ TAILSCALE FUNNEL ACTIVE                ║"
+        echo -e "╚════════════════════════════════════════════╝${NC}"
+        echo ""
+        echo -e "${GREEN}Your HTTPS URL:${NC}"
+        echo -e "  ${CYAN}$FUNNEL_URL${NC}"
+        echo ""
+    else
+        echo -e "${RED}⚠ Funnel URL not found. Check manually:${NC}"
+        echo "  sudo tailscale funnel status"
+        echo ""
+    fi
+}
+
+# ============================================
+# AUTO-SYNC CRON SETUP
 # ============================================
 setup_cron() {
     echo -e "${YELLOW}Setting up auto-sync cron job (every 10 minutes)...${NC}"
@@ -83,17 +155,14 @@ setup_cron() {
     VENV_PYTHON="$PROJECT_DIR/venv/bin/python3"
     LOG_FILE="$PROJECT_DIR/sync.log"
 
-    # Purana cron job hatao (agar hai)
     crontab -l 2>/dev/null | grep -v "sync_cron.py" | crontab - 2>/dev/null || true
-
-    # Naya cron job add karo
     (crontab -l 2>/dev/null; echo "*/10 * * * * cd $BACKEND_DIR && $VENV_PYTHON sync_cron.py >> $LOG_FILE 2>&1") | crontab -
 
     echo -e "${GREEN}  ✓ Cron job added (every 10 minutes)${NC}"
 }
 
 # ============================================
-# CREATE sync_cron.py (Called automatically)
+# CREATE sync_cron.py
 # ============================================
 create_sync_script() {
     if [ ! -f "backend/sync_cron.py" ]; then
@@ -170,7 +239,7 @@ setup_project() {
 deploy_ubuntu() {
     echo -e "${YELLOW}[1/7] Updating system...${NC}"
     sudo apt update -qq
-    sudo apt install -y -qq python3 python3-venv python3-pip git cron
+    sudo apt install -y -qq python3 python3-venv python3-pip git cron curl
 
     echo -e "${YELLOW}[2/7] Setting up virtual environment...${NC}"
     [ ! -d "venv" ] && python3 -m venv venv
@@ -188,7 +257,7 @@ deploy_ubuntu() {
         echo "  DELTA_API_KEY=your_key"
         echo "  DELTA_API_SECRET=your_secret"
         echo "  SUPABASE_URL=https://xxxx.supabase.co"
-        echo "  SUPABASE_KEY=your_anon_key"
+        echo "  SUPABASE_KEY=your_secret_key"
         echo ""
         echo "Then run: nano .env"
         exit 1
@@ -215,45 +284,53 @@ EOF
     sudo systemctl enable journal
     sudo systemctl restart journal
 
-    # Auto-setup sync script + cron
+    echo -e "${YELLOW}[5/7] Setting up cron job...${NC}"
     create_sync_script
     setup_cron
 
-    echo -e "${YELLOW}[6/7] Checking status...${NC}"
+    echo -e "${YELLOW}[6/7] Checking service...${NC}"
     sleep 3
 
     if sudo systemctl is-active --quiet journal; then
-        echo -e "${GREEN}[7/7] ✓ Deploy Successful!${NC}"
-        show_success
-        show_cron_info
+        echo -e "${GREEN}✓ Service running!${NC}"
     else
-        echo -e "${RED}✗ Deploy Failed! Check logs: sudo journalctl -u journal -n 50${NC}"
+        echo -e "${RED}✗ Service failed!${NC}"
+        sudo journalctl -u journal -n 20
         exit 1
     fi
+
+    # Auto-setup Tailscale Funnel
+    echo -e "${YELLOW}[7/7] Setting up Tailscale Funnel (HTTPS)...${NC}"
+    setup_tailscale_auto
+
+    echo ""
+    echo -e "${GREEN}✓ Deploy Complete!${NC}"
+    show_success
+    show_cron_info
 }
 
 # ============================================
 # OTHER LINUX
 # ============================================
 deploy_linux() {
-    echo -e "${YELLOW}[1/5] Installing Python and Git...${NC}"
+    echo -e "${YELLOW}[1/6] Installing Python and Git...${NC}"
     
     if command -v dnf &> /dev/null; then
-        sudo dnf install -y python3 python3-pip git cronie
+        sudo dnf install -y python3 python3-pip git cronie curl
     elif command -v pacman &> /dev/null; then
-        sudo pacman -S --noconfirm python python-pip git cronie
+        sudo pacman -S --noconfirm python python-pip git cronie curl
     elif command -v zypper &> /dev/null; then
-        sudo zypper install -y python3 python3-pip git cron
+        sudo zypper install -y python3 python3-pip git cron curl
     else
         echo -e "${RED}Cannot detect package manager!${NC}"
         exit 1
     fi
 
-    echo -e "${YELLOW}[2/5] Setting up virtual environment...${NC}"
+    echo -e "${YELLOW}[2/6] Setting up virtual environment...${NC}"
     [ ! -d "venv" ] && python3 -m venv venv
     source venv/bin/activate
 
-    echo -e "${YELLOW}[3/5] Installing dependencies...${NC}"
+    echo -e "${YELLOW}[3/6] Installing dependencies...${NC}"
     pip install -q --upgrade pip
     pip install -q fastapi uvicorn httpx python-dotenv supabase openpyxl reportlab
 
@@ -262,22 +339,22 @@ deploy_linux() {
         exit 1
     fi
 
-    echo -e "${YELLOW}[4/5] Enabling cron service...${NC}"
+    echo -e "${YELLOW}[4/6] Enabling cron service...${NC}"
     sudo systemctl enable crond 2>/dev/null || sudo systemctl enable cron 2>/dev/null || true
     sudo systemctl start crond 2>/dev/null || sudo systemctl start cron 2>/dev/null || true
 
-    # Auto-setup sync script + cron
+    echo -e "${YELLOW}[5/6] Setting up cron job...${NC}"
     create_sync_script
     setup_cron
 
-    echo -e "${YELLOW}[5/5] Done!${NC}"
+    echo -e "${YELLOW}[6/6] Setting up Tailscale Funnel...${NC}"
+    setup_tailscale_auto
+
     echo ""
     echo "Start server manually:"
     echo "  cd $(pwd)/backend"
     echo "  source ../venv/bin/activate"
     echo "  uvicorn main:app --host 0.0.0.0 --port 8000"
-    echo ""
-    echo "Auto-sync: every 10 minutes"
     echo ""
 }
 
@@ -285,20 +362,19 @@ deploy_linux() {
 # macOS
 # ============================================
 deploy_mac() {
-    echo -e "${YELLOW}[1/5] Checking Homebrew...${NC}"
+    echo -e "${YELLOW}[1/6] Checking Homebrew...${NC}"
     if ! command -v brew &> /dev/null; then
-        echo "Installing Homebrew..."
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     fi
 
-    echo -e "${YELLOW}[2/5] Installing Python...${NC}"
+    echo -e "${YELLOW}[2/6] Installing Python...${NC}"
     brew install python3 git
 
-    echo -e "${YELLOW}[3/5] Setting up virtual environment...${NC}"
+    echo -e "${YELLOW}[3/6] Setting up virtual environment...${NC}"
     [ ! -d "venv" ] && python3 -m venv venv
     source venv/bin/activate
 
-    echo -e "${YELLOW}[4/5] Installing dependencies...${NC}"
+    echo -e "${YELLOW}[4/6] Installing dependencies...${NC}"
     pip install -q --upgrade pip
     pip install -q fastapi uvicorn httpx python-dotenv supabase openpyxl reportlab
 
@@ -307,11 +383,15 @@ deploy_mac() {
         exit 1
     fi
 
-    # Auto-setup sync script + cron
+    echo -e "${YELLOW}[5/6] Setting up cron job...${NC}"
     create_sync_script
     setup_cron
 
-    echo -e "${YELLOW}[5/5] Starting server...${NC}"
+    echo -e "${YELLOW}[6/6] Setting up Tailscale Funnel...${NC}"
+    setup_tailscale_auto
+
+    echo ""
+    echo "Starting server..."
     cd backend
     uvicorn main:app --host 0.0.0.0 --port 8000
 }
@@ -339,12 +419,9 @@ deploy_windows() {
         exit 1
     fi
 
-    # Auto-setup sync script
     create_sync_script
 
     echo -e "${YELLOW}[4/5] Windows Task Scheduler setup...${NC}"
-    echo ""
-    echo -e "${YELLOW}Windows pe cron nahi hota. Task Scheduler use karo:${NC}"
     echo ""
     echo "1. Open Task Scheduler (taskschd.msc)"
     echo "2. Create Basic Task"
@@ -403,14 +480,21 @@ check_status() {
         sudo systemctl status journal --no-pager | head -15
     else
         echo -e "${RED}Service is not running.${NC}"
-        echo ""
-        sudo systemctl status journal --no-pager 2>&1 | head -5 || echo "Service not found"
     fi
     
     echo ""
     echo -e "${CYAN}Cron Job Status:${NC}"
     echo ""
     crontab -l 2>/dev/null | grep "sync_cron.py" || echo "No cron job found"
+    
+    echo ""
+    echo -e "${CYAN}Tailscale Funnel Status:${NC}"
+    echo ""
+    if command -v tailscale &> /dev/null; then
+        sudo tailscale funnel status 2>/dev/null || echo "Funnel not configured"
+    else
+        echo "Tailscale not installed"
+    fi
     echo ""
 }
 
@@ -464,10 +548,20 @@ uninstall_service() {
     echo -e "${YELLOW}[1/4] Stopping service...${NC}"
     sudo systemctl stop journal 2>/dev/null || echo "Service not running"
     
-    echo -e "${YELLOW}[2/4] Removing service + cron...${NC}"
+    echo -e "${YELLOW}[2/4] Removing service + cron + tailscale...${NC}"
     sudo systemctl disable journal 2>/dev/null || true
     sudo rm -f /etc/systemd/system/journal.service
     crontab -l 2>/dev/null | grep -v "sync_cron.py" | crontab - 2>/dev/null || true
+    
+    # Remove Tailscale
+    if command -v tailscale &> /dev/null; then
+        sudo tailscale funnel --bg off 2>/dev/null || true
+        sudo tailscale logout 2>/dev/null || true
+        sudo systemctl stop tailscaled 2>/dev/null || true
+        sudo systemctl disable tailscaled 2>/dev/null || true
+        sudo apt remove tailscale -y 2>/dev/null || true
+        sudo rm -rf /var/lib/tailscale 2>/dev/null || true
+    fi
     
     echo -e "${YELLOW}[3/4] Reloading systemd...${NC}"
     sudo systemctl daemon-reload
@@ -475,7 +569,7 @@ uninstall_service() {
     
     echo -e "${YELLOW}[4/4] Done${NC}"
     echo ""
-    echo -e "${GREEN}✓ Service + cron uninstalled${NC}"
+    echo -e "${GREEN}✓ Service + cron + tailscale uninstalled${NC}"
     echo "Project files still in: $(pwd)"
     echo ""
 }
@@ -492,12 +586,21 @@ full_uninstall() {
     echo -e "${YELLOW}[1/4] Stopping service...${NC}"
     sudo systemctl stop journal 2>/dev/null || true
     
-    echo -e "${YELLOW}[2/4] Removing service + cron...${NC}"
+    echo -e "${YELLOW}[2/4] Removing service + cron + tailscale...${NC}"
     sudo systemctl disable journal 2>/dev/null || true
     sudo rm -f /etc/systemd/system/journal.service
     crontab -l 2>/dev/null | grep -v "sync_cron.py" | crontab - 2>/dev/null || true
     sudo systemctl daemon-reload
     sudo systemctl reset-failed 2>/dev/null || true
+    
+    if command -v tailscale &> /dev/null; then
+        sudo tailscale funnel --bg off 2>/dev/null || true
+        sudo tailscale logout 2>/dev/null || true
+        sudo systemctl stop tailscaled 2>/dev/null || true
+        sudo systemctl disable tailscaled 2>/dev/null || true
+        sudo apt remove tailscale -y 2>/dev/null || true
+        sudo rm -rf /var/lib/tailscale 2>/dev/null || true
+    fi
     
     echo -e "${YELLOW}[3/4] Project directory:${NC}"
     PROJECT_DIR=$(pwd)
