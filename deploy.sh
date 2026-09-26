@@ -3,8 +3,6 @@
 # ============================================
 # Trading Journal - Universal Deploy Script
 # ============================================
-# Supports: Linux, Mac, Windows (Git Bash/WSL)
-# ============================================
 
 set -e
 
@@ -15,7 +13,6 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-# Detect OS
 detect_os() {
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
         if [ -f /etc/os-release ]; then
@@ -39,9 +36,6 @@ detect_os() {
 
 DETECTED_OS=$(detect_os)
 
-# ============================================
-# MENU
-# ============================================
 show_menu() {
     echo ""
     echo -e "${CYAN}╔════════════════════════════════════════════╗"
@@ -73,7 +67,7 @@ show_menu() {
 }
 
 # ============================================
-# TAILSCALE AUTO-SETUP (Called automatically)
+# TAILSCALE FUNNEL AUTO-SETUP
 # ============================================
 setup_tailscale_auto() {
     echo ""
@@ -82,7 +76,6 @@ setup_tailscale_auto() {
     echo -e "${CYAN}═══════════════════════════════════════════${NC}"
     echo ""
 
-    # Check if already installed
     if command -v tailscale &> /dev/null; then
         echo -e "${GREEN}✓ Tailscale already installed${NC}"
     else
@@ -95,10 +88,10 @@ setup_tailscale_auto() {
     echo -e "${YELLOW}Logging in to Tailscale...${NC}"
     echo ""
     echo -e "${CYAN}IMPORTANT:${NC}"
-    echo "  • Ek URL aayega — browser mein kholo"
-    echo "  • Login karo (Google/GitHub/Microsoft)"
-    echo "  • Authorize karo"
-    echo "  • Terminal mein wapas aao"
+    echo "  • A URL will appear — open it in browser"
+    echo "  • Login (Google/GitHub/Microsoft)"
+    echo "  • Authorize"
+    echo "  • Return to terminal"
     echo ""
     read -p "Press Enter to continue..."
 
@@ -123,8 +116,6 @@ setup_tailscale_auto() {
 
     sleep 3
 
-    echo ""
-    echo -e "${YELLOW}Getting your HTTPS URL...${NC}"
     FUNNEL_STATUS=$(sudo tailscale funnel status 2>/dev/null)
 
     if echo "$FUNNEL_STATUS" | grep -q "https://"; then
@@ -137,10 +128,6 @@ setup_tailscale_auto() {
         echo -e "${GREEN}Your HTTPS URL:${NC}"
         echo -e "  ${CYAN}$FUNNEL_URL${NC}"
         echo ""
-    else
-        echo -e "${RED}⚠ Funnel URL not found. Check manually:${NC}"
-        echo "  sudo tailscale funnel status"
-        echo ""
     fi
 }
 
@@ -149,7 +136,7 @@ setup_tailscale_auto() {
 # ============================================
 setup_cron() {
     echo -e "${YELLOW}Setting up auto-sync cron job (every 10 minutes)...${NC}"
-    
+
     PROJECT_DIR=$(pwd)
     BACKEND_DIR="$PROJECT_DIR/backend"
     VENV_PYTHON="$PROJECT_DIR/venv/bin/python3"
@@ -222,9 +209,6 @@ PYEOF
     fi
 }
 
-# ============================================
-# PROJECT SETUP
-# ============================================
 setup_project() {
     if [ ! -d "trading-journal" ]; then
         echo -e "${YELLOW}Cloning repository...${NC}"
@@ -237,17 +221,17 @@ setup_project() {
 # UBUNTU / DEBIAN
 # ============================================
 deploy_ubuntu() {
-    echo -e "${YELLOW}[1/7] Updating system...${NC}"
+    echo -e "${YELLOW}[1/8] Updating system...${NC}"
     sudo apt update -qq
     sudo apt install -y -qq python3 python3-venv python3-pip git cron curl
 
-    echo -e "${YELLOW}[2/7] Setting up virtual environment...${NC}"
+    echo -e "${YELLOW}[2/8] Setting up virtual environment...${NC}"
     [ ! -d "venv" ] && python3 -m venv venv
     source venv/bin/activate
 
-    echo -e "${YELLOW}[3/7] Installing dependencies...${NC}"
+    echo -e "${YELLOW}[3/8] Installing dependencies...${NC}"
     pip install -q --upgrade pip
-    pip install -q fastapi uvicorn httpx python-dotenv supabase openpyxl reportlab
+    pip install -q fastapi uvicorn httpx python-dotenv supabase openpyxl reportlab slowapi bcrypt
 
     if [ ! -f ".env" ]; then
         echo ""
@@ -257,13 +241,16 @@ deploy_ubuntu() {
         echo "  DELTA_API_KEY=your_key"
         echo "  DELTA_API_SECRET=your_secret"
         echo "  SUPABASE_URL=https://xxxx.supabase.co"
-        echo "  SUPABASE_KEY=your_secret_key"
+        echo "  SUPABASE_KEY=your_service_role_key"
+        echo "  API_KEY=your_random_api_key"
+        echo "  LOGIN_USER=admin"
+        echo "  LOGIN_PASS_HASH=your_bcrypt_hash"
         echo ""
         echo "Then run: nano .env"
         exit 1
     fi
 
-    echo -e "${YELLOW}[4/7] Setting up systemd service...${NC}"
+    echo -e "${YELLOW}[4/8] Setting up systemd service...${NC}"
     sudo tee /etc/systemd/system/journal.service > /dev/null <<EOF
 [Unit]
 Description=Trading Journal FastAPI
@@ -272,7 +259,7 @@ After=network.target
 [Service]
 User=$USER
 WorkingDirectory=$(pwd)/backend
-ExecStart=$(pwd)/venv/bin/python3 -m uvicorn main:app --host 0.0.0.0 --port 8000
+ExecStart=$(pwd)/venv/bin/python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 --no-server-header
 Restart=always
 RestartSec=5
 
@@ -284,23 +271,23 @@ EOF
     sudo systemctl enable journal
     sudo systemctl restart journal
 
-    echo -e "${YELLOW}[5/7] Setting up cron job...${NC}"
+    echo -e "${YELLOW}[5/8] Setting up cron job...${NC}"
     create_sync_script
     setup_cron
 
-    echo -e "${YELLOW}[6/7] Checking service...${NC}"
-    sleep 3
+    echo -e "${YELLOW}[6/8] Creating audit log...${NC}"
+    touch audit.log
+    chmod 600 audit.log
+    echo -e "${GREEN}  ✓ audit.log created${NC}"
 
-    if sudo systemctl is-active --quiet journal; then
-        echo -e "${GREEN}✓ Service running!${NC}"
-    else
-        echo -e "${RED}✗ Service failed!${NC}"
-        sudo journalctl -u journal -n 20
-        exit 1
-    fi
+    echo -e "${YELLOW}[7/8] Setting up UFW...${NC}"
+    sudo ufw allow 22/tcp 2>/dev/null || true
+    sudo ufw allow 80/tcp 2>/dev/null || true
+    sudo ufw allow 443/tcp 2>/dev/null || true
+    sudo ufw allow from 100.64.0.0/10 to any port 8000 2>/dev/null || true
+    sudo ufw --force enable 2>/dev/null || true
 
-    # Auto-setup Tailscale Funnel
-    echo -e "${YELLOW}[7/7] Setting up Tailscale Funnel (HTTPS)...${NC}"
+    echo -e "${YELLOW}[8/8] Setting up Tailscale Funnel...${NC}"
     setup_tailscale_auto
 
     echo ""
@@ -314,7 +301,7 @@ EOF
 # ============================================
 deploy_linux() {
     echo -e "${YELLOW}[1/6] Installing Python and Git...${NC}"
-    
+
     if command -v dnf &> /dev/null; then
         sudo dnf install -y python3 python3-pip git cronie curl
     elif command -v pacman &> /dev/null; then
@@ -332,7 +319,7 @@ deploy_linux() {
 
     echo -e "${YELLOW}[3/6] Installing dependencies...${NC}"
     pip install -q --upgrade pip
-    pip install -q fastapi uvicorn httpx python-dotenv supabase openpyxl reportlab
+    pip install -q fastapi uvicorn httpx python-dotenv supabase openpyxl reportlab slowapi bcrypt
 
     if [ ! -f ".env" ]; then
         echo -e "${RED}ERROR: .env file missing!${NC}"
@@ -354,7 +341,7 @@ deploy_linux() {
     echo "Start server manually:"
     echo "  cd $(pwd)/backend"
     echo "  source ../venv/bin/activate"
-    echo "  uvicorn main:app --host 0.0.0.0 --port 8000"
+    echo "  uvicorn main:app --host 0.0.0.0 --port 8000 --no-server-header"
     echo ""
 }
 
@@ -376,7 +363,7 @@ deploy_mac() {
 
     echo -e "${YELLOW}[4/6] Installing dependencies...${NC}"
     pip install -q --upgrade pip
-    pip install -q fastapi uvicorn httpx python-dotenv supabase openpyxl reportlab
+    pip install -q fastapi uvicorn httpx python-dotenv supabase openpyxl reportlab slowapi bcrypt
 
     if [ ! -f ".env" ]; then
         echo -e "${RED}ERROR: .env file missing!${NC}"
@@ -393,7 +380,7 @@ deploy_mac() {
     echo ""
     echo "Starting server..."
     cd backend
-    uvicorn main:app --host 0.0.0.0 --port 8000
+    uvicorn main:app --host 0.0.0.0 --port 8000 --no-server-header
 }
 
 # ============================================
@@ -412,7 +399,7 @@ deploy_windows() {
 
     echo -e "${YELLOW}[3/5] Installing dependencies...${NC}"
     pip install -q --upgrade pip
-    pip install -q fastapi uvicorn httpx python-dotenv supabase openpyxl reportlab
+    pip install -q fastapi uvicorn httpx python-dotenv supabase openpyxl reportlab slowapi bcrypt
 
     if [ ! -f ".env" ]; then
         echo -e "${RED}ERROR: .env file missing!${NC}"
@@ -435,12 +422,9 @@ deploy_windows() {
 
     echo -e "${YELLOW}[5/5] Starting server...${NC}"
     cd backend
-    python -m uvicorn main:app --host 0.0.0.0 --port 8000
+    python -m uvicorn main:app --host 0.0.0.0 --port 8000 --no-server-header
 }
 
-# ============================================
-# WINDOWS NATIVE
-# ============================================
 deploy_windows_native() {
     echo ""
     echo -e "${CYAN}WINDOWS NATIVE - MANUAL INSTRUCTIONS${NC}"
@@ -455,17 +439,10 @@ deploy_windows_native() {
     echo "  cd trading-journal"
     echo "  python -m venv venv"
     echo "  venv\\Scripts\\activate"
-    echo "  pip install fastapi uvicorn httpx python-dotenv supabase openpyxl reportlab"
+    echo "  pip install fastapi uvicorn httpx python-dotenv supabase openpyxl reportlab slowapi bcrypt"
     echo "  notepad .env"
     echo "  cd backend"
-    echo "  python -m uvicorn main:app --host 127.0.0.1 --port 8000"
-    echo ""
-    echo "Step 4: Auto-sync setup (Task Scheduler):"
-    echo "  → Open taskschd.msc"
-    echo "  → Create Basic Task"
-    echo "  → Trigger: Daily, repeat every 10 minutes"
-    echo "  → Action: python.exe sync_cron.py"
-    echo "  → Start in: trading-journal/backend"
+    echo "  python -m uvicorn main:app --host 127.0.0.1 --port 8000 --no-server-header"
     echo ""
 }
 
@@ -481,12 +458,12 @@ check_status() {
     else
         echo -e "${RED}Service is not running.${NC}"
     fi
-    
+
     echo ""
     echo -e "${CYAN}Cron Job Status:${NC}"
     echo ""
     crontab -l 2>/dev/null | grep "sync_cron.py" || echo "No cron job found"
-    
+
     echo ""
     echo -e "${CYAN}Tailscale Funnel Status:${NC}"
     echo ""
@@ -513,7 +490,7 @@ restart_service() {
 stop_service() {
     echo ""
     echo -e "${YELLOW}Stopping service...${NC}"
-    
+
     if sudo systemctl is-active --quiet journal; then
         sudo systemctl stop journal
         sleep 1
@@ -535,25 +512,21 @@ view_logs() {
     sudo journalctl -u journal -f
 }
 
-# ============================================
-# UNINSTALL
-# ============================================
 uninstall_service() {
     echo ""
     echo -e "${RED}UNINSTALL - SERVICE ONLY${NC}"
     echo ""
     read -p "Are you sure? (yes/no): " CONFIRM
     [ "$CONFIRM" != "yes" ] && echo "Cancelled." && return
-    
+
     echo -e "${YELLOW}[1/4] Stopping service...${NC}"
     sudo systemctl stop journal 2>/dev/null || echo "Service not running"
-    
+
     echo -e "${YELLOW}[2/4] Removing service + cron + tailscale...${NC}"
     sudo systemctl disable journal 2>/dev/null || true
     sudo rm -f /etc/systemd/system/journal.service
     crontab -l 2>/dev/null | grep -v "sync_cron.py" | crontab - 2>/dev/null || true
-    
-    # Remove Tailscale
+
     if command -v tailscale &> /dev/null; then
         sudo tailscale funnel --bg off 2>/dev/null || true
         sudo tailscale logout 2>/dev/null || true
@@ -562,11 +535,11 @@ uninstall_service() {
         sudo apt remove tailscale -y 2>/dev/null || true
         sudo rm -rf /var/lib/tailscale 2>/dev/null || true
     fi
-    
+
     echo -e "${YELLOW}[3/4] Reloading systemd...${NC}"
     sudo systemctl daemon-reload
     sudo systemctl reset-failed 2>/dev/null || true
-    
+
     echo -e "${YELLOW}[4/4] Done${NC}"
     echo ""
     echo -e "${GREEN}✓ Service + cron + tailscale uninstalled${NC}"
@@ -582,17 +555,17 @@ full_uninstall() {
     echo ""
     read -p "Type 'DELETE' to confirm: " CONFIRM
     [ "$CONFIRM" != "DELETE" ] && echo "Cancelled." && return
-    
+
     echo -e "${YELLOW}[1/4] Stopping service...${NC}"
     sudo systemctl stop journal 2>/dev/null || true
-    
+
     echo -e "${YELLOW}[2/4] Removing service + cron + tailscale...${NC}"
     sudo systemctl disable journal 2>/dev/null || true
     sudo rm -f /etc/systemd/system/journal.service
     crontab -l 2>/dev/null | grep -v "sync_cron.py" | crontab - 2>/dev/null || true
     sudo systemctl daemon-reload
     sudo systemctl reset-failed 2>/dev/null || true
-    
+
     if command -v tailscale &> /dev/null; then
         sudo tailscale funnel --bg off 2>/dev/null || true
         sudo tailscale logout 2>/dev/null || true
@@ -601,11 +574,11 @@ full_uninstall() {
         sudo apt remove tailscale -y 2>/dev/null || true
         sudo rm -rf /var/lib/tailscale 2>/dev/null || true
     fi
-    
+
     echo -e "${YELLOW}[3/4] Project directory:${NC}"
     PROJECT_DIR=$(pwd)
     echo "$PROJECT_DIR"
-    
+
     echo -e "${YELLOW}[4/4] Deleting project files...${NC}"
     cd ~
     read -p "Delete '$PROJECT_DIR'? (yes/no): " CONFIRM2
@@ -615,15 +588,12 @@ full_uninstall() {
     else
         echo "Project files kept at: $PROJECT_DIR"
     fi
-    
+
     echo ""
     echo -e "${GREEN}✓ Full uninstall complete${NC}"
     echo ""
 }
 
-# ============================================
-# SUCCESS MESSAGES
-# ============================================
 show_success() {
     echo ""
     echo -e "${GREEN}╔════════════════════════════════════════════╗"
@@ -638,8 +608,6 @@ show_success() {
     echo "  Restart: sudo systemctl restart journal"
     echo "  Stop:    sudo systemctl stop journal"
     echo ""
-    echo "Next: Open http://YOUR_SERVER_IP:8000"
-    echo ""
 }
 
 show_cron_info() {
@@ -652,9 +620,6 @@ show_cron_info() {
     echo ""
 }
 
-# ============================================
-# RUN
-# ============================================
 show_menu
 
 case $CHOICE in
